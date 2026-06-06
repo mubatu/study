@@ -1,0 +1,10 @@
+name = "study-timer"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-05-03"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "study-production"
+database_id = "3a9d7c3c-977d-43e1-82ab-993de4c70bee"
+preview_database_id = "92312cc5-cdc7-49b5-a950-081d6c2d2185"
+migrations_dir = "migrations"

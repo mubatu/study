@@ -1,6 +1,8 @@
 import type {
   ApiError,
   DashboardResponse,
+  LeaderboardPeriod,
+  LeaderboardResponse,
   StateResponse,
   StudyState,
   UserProfile,
@@ -41,6 +43,14 @@ export function getDashboard(
 ): Promise<DashboardResponse> {
   const params = new URLSearchParams({ userId, month });
   return request<DashboardResponse>(`/api/dashboard?${params}`);
+}
+
+export function getLeaderboard(
+  userId: string,
+  period: LeaderboardPeriod,
+): Promise<LeaderboardResponse> {
+  const params = new URLSearchParams({ userId, period });
+  return request<LeaderboardResponse>(`/api/leaderboard?${params}`);
 }
 
 export function setStudyState(

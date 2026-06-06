@@ -27,6 +27,24 @@ export interface StateResponse {
   activeSince: string | null;
 }
 
+export type LeaderboardPeriod = "today" | "month";
+
+export interface LeaderboardEntry {
+  rank: number;
+  user: UserProfile;
+  totalSeconds: number;
+  isStudying: boolean;
+}
+
+export interface LeaderboardResponse {
+  serverTime: string;
+  period: LeaderboardPeriod;
+  periodStart: string;
+  periodEnd: string;
+  entries: LeaderboardEntry[];
+  currentUser: LeaderboardEntry | null;
+}
+
 export interface ApiError {
   error: string;
 }

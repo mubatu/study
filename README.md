@@ -9,6 +9,7 @@ Functions, and Cloudflare D1.
 - Studying/resting state with server-authoritative live timing
 - Daily totals using a 07:00 to 06:59 `Europe/Istanbul` study day
 - Monthly calendar history with session counts
+- Today and current-month leaderboards with live-session totals
 - Sessions that continue across page closures and devices
 - Idempotent state transitions and one-open-session database enforcement
 
@@ -57,6 +58,10 @@ npm run db:migrate:production
 
 Pushes to the production branch are deployed automatically by the Cloudflare
 Pages Git integration.
+
+The leaderboard is available at
+`GET /api/leaderboard?userId=<uuid>&period=today|month`. Apply new migrations
+before merging a branch that introduces a schema or index change.
 
 The profile name is intentionally not authentication. Anyone entering the same
 normalized name receives access to that profile and its study history.

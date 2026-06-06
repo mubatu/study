@@ -1,4 +1,5 @@
 import { HttpError } from "./http";
+import type { LeaderboardPeriod } from "../../shared/contracts";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -48,6 +49,13 @@ export function requireUserId(input: unknown): string {
 export function requireMonth(input: unknown): string {
   if (typeof input !== "string" || !MONTH_PATTERN.test(input)) {
     throw new HttpError(400, "Month must use YYYY-MM format.");
+  }
+  return input;
+}
+
+export function requireLeaderboardPeriod(input: unknown): LeaderboardPeriod {
+  if (input !== "today" && input !== "month") {
+    throw new HttpError(400, "Period must be today or month.");
   }
   return input;
 }

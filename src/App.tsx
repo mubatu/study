@@ -1,13 +1,21 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type {
   DashboardResponse,
+  LeaderboardPeriod,
+  LeaderboardResponse,
   UserProfile,
 } from "../shared/contracts";
 import { studyDayKeyForInstant, studyDayBounds } from "../shared/studyTime";
+import { Leaderboard } from "./components/Leaderboard";
 import { StudyCalendar } from "./components/StudyCalendar";
 import { TimerPanel } from "./components/TimerPanel";
 import { BookMark } from "./components/Icons";
-import { getDashboard, openProfile, setStudyState } from "./lib/api";
+import {
+  getDashboard,
+  getLeaderboard,
+  openProfile,
+  setStudyState,
+} from "./lib/api";
 import { currentStudyMonth } from "./lib/format";
 
 const STORAGE_KEY = "study-timer.profile.v1";
@@ -34,11 +42,17 @@ function App() {
     studyDayKeyForInstant(Date.now()),
   );
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [leaderboardPeriod, setLeaderboardPeriod] =
+    useState<LeaderboardPeriod>("today");
+  const [leaderboard, setLeaderboard] =
+    useState<LeaderboardResponse | null>(null);
   const [clockMs, setClockMs] = useState(Date.now());
   const [snapshotReceivedAt, setSnapshotReceivedAt] = useState(Date.now());
   const [loading, setLoading] = useState(false);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 
   const applyDashboard = useCallback((next: DashboardResponse) => {
     setDashboard(next);
@@ -68,9 +82,36 @@ function App() {
     [applyDashboard, month, profile],
   );
 
+  const refreshLeaderboard = useCallback(
+    async (quiet = false) => {
+      if (!profile) return;
+      if (!quiet) setLeaderboardLoading(true);
+
+      try {
+        setLeaderboard(
+          await getLeaderboard(profile.id, leaderboardPeriod),
+        );
+        setLeaderboardError(null);
+      } catch (requestError) {
+        setLeaderboardError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Could not refresh the leaderboard.",
+        );
+      } finally {
+        if (!quiet) setLeaderboardLoading(false);
+      }
+    },
+    [leaderboardPeriod, profile],
+  );
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    void refreshLeaderboard();
+  }, [refreshLeaderboard]);
 
   useEffect(() => {
     if (dashboard?.state !== "studying") return;
@@ -82,8 +123,12 @@ function App() {
   useEffect(() => {
     if (!profile) return;
 
-    const onFocus = () => void refresh(true);
-    const onOnline = () => void refresh(true);
+    const refreshAll = () => {
+      void refresh(true);
+      void refreshLeaderboard(true);
+    };
+    const onFocus = () => refreshAll();
+    const onOnline = () => refreshAll();
     window.addEventListener("focus", onFocus);
     window.addEventListener("online", onOnline);
 
@@ -91,7 +136,17 @@ function App() {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", onOnline);
     };
-  }, [profile, refresh]);
+  }, [profile, refresh, refreshLeaderboard]);
+
+  useEffect(() => {
+    if (dashboard?.state !== "studying") return;
+
+    const interval = window.setInterval(
+      () => void refreshLeaderboard(true),
+      60_000,
+    );
+    return () => window.clearInterval(interval);
+  }, [dashboard?.state, refreshLeaderboard]);
 
   useEffect(() => {
     if (!profile) return;
@@ -104,10 +159,11 @@ function App() {
       setSelectedDate(nextKey);
       setMonth(nextKey.slice(0, 7));
       void refresh(true);
+      void refreshLeaderboard(true);
     }, Math.max(1_000, nextBoundary - now + 1_000));
 
     return () => window.clearTimeout(timeout);
-  }, [profile, refresh, dashboard?.serverTime]);
+  }, [profile, refresh, refreshLeaderboard, dashboard?.serverTime]);
 
   const liveValues = useMemo(() => {
     if (!dashboard) return { activeSeconds: 0, todaySeconds: 0 };
@@ -165,7 +221,23 @@ function App() {
         profile.id,
         dashboard.state === "studying" ? "resting" : "studying",
       );
-      applyDashboard(await getDashboard(profile.id, month));
+      const [dashboardResult, leaderboardResult] = await Promise.allSettled([
+        getDashboard(profile.id, month),
+        getLeaderboard(profile.id, leaderboardPeriod),
+      ]);
+
+      if (dashboardResult.status === "rejected") {
+        throw dashboardResult.reason;
+      }
+
+      applyDashboard(dashboardResult.value);
+
+      if (leaderboardResult.status === "fulfilled") {
+        setLeaderboard(leaderboardResult.value);
+        setLeaderboardError(null);
+      } else {
+        setLeaderboardError("Could not refresh the leaderboard.");
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -181,7 +253,9 @@ function App() {
     localStorage.removeItem(STORAGE_KEY);
     setProfile(null);
     setDashboard(null);
+    setLeaderboard(null);
     setError(null);
+    setLeaderboardError(null);
   }
 
   if (!profile) {
@@ -267,6 +341,15 @@ function App() {
             todaySeconds={liveValues.todaySeconds}
             pending={pending}
             onToggle={() => void handleToggle()}
+          />
+          <Leaderboard
+            data={leaderboard}
+            period={leaderboardPeriod}
+            currentUserId={profile.id}
+            loading={leaderboardLoading}
+            error={leaderboardError}
+            onPeriodChange={setLeaderboardPeriod}
+            onRetry={() => void refreshLeaderboard()}
           />
           <StudyCalendar
             month={month}

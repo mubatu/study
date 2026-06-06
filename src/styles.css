@@ -342,6 +342,237 @@ input:focus-visible {
   height: 23px;
 }
 
+.leaderboard {
+  margin-bottom: 42px;
+}
+
+.leaderboard-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.leaderboard h2 {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 23px;
+  letter-spacing: -0.035em;
+}
+
+.leaderboard-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #eef1f6;
+}
+
+.leaderboard-tabs button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.leaderboard-tabs button.is-active {
+  color: var(--blue);
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(26, 42, 77, 0.09);
+}
+
+.leaderboard-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(26, 42, 77, 0.045);
+  transition: opacity 150ms ease;
+}
+
+.leaderboard-card--loading {
+  opacity: 0.66;
+}
+
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-height: 67px;
+  padding: 10px 15px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.leaderboard-row:last-child {
+  border-bottom: 0;
+}
+
+.leaderboard-row--current {
+  background: var(--blue-soft);
+}
+
+.leaderboard-rank {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--muted);
+  background: #f2f4f8;
+  font-family: "Manrope", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-row:nth-of-type(1) .leaderboard-rank {
+  color: #755515;
+  background: #fff0bd;
+}
+
+.leaderboard-row:nth-of-type(2) .leaderboard-rank {
+  color: #566173;
+  background: #e8edf4;
+}
+
+.leaderboard-row:nth-of-type(3) .leaderboard-rank {
+  color: #8a4e2d;
+  background: #f6dfd2;
+}
+
+.leaderboard-person {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leaderboard-person strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-person > span {
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.leaderboard-active {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--blue) !important;
+}
+
+.leaderboard-active i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 0 3px rgba(33, 87, 213, 0.1);
+}
+
+.leaderboard-time {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.leaderboard-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  border-bottom: 1px solid #edf0f5;
+  background: #fafbfc;
+}
+
+.leaderboard-divider span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.leaderboard-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 15px;
+  color: #8e3828;
+  background: #fff4f1;
+  font-size: 12px;
+}
+
+.leaderboard-message button {
+  border: 0;
+  color: #8e3828;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.leaderboard-empty,
+.leaderboard-skeleton {
+  display: grid;
+  min-height: 126px;
+  place-content: center;
+  justify-items: center;
+}
+
+.leaderboard-empty {
+  gap: 4px;
+  padding: 24px;
+  text-align: center;
+}
+
+.leaderboard-empty strong {
+  font-size: 14px;
+}
+
+.leaderboard-empty span,
+.leaderboard-nudge {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.leaderboard-skeleton {
+  gap: 10px;
+}
+
+.leaderboard-skeleton span {
+  width: 190px;
+  height: 10px;
+  border-radius: 8px;
+  background: #edf0f5;
+}
+
+.leaderboard-skeleton span:nth-child(2) {
+  width: 150px;
+}
+
+.leaderboard-nudge {
+  margin: 0;
+  padding: 12px 15px;
+  border-top: 1px solid #edf0f5;
+  text-align: center;
+}
+
 .history {
   padding-top: 1px;
 }

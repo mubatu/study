@@ -42,25 +42,21 @@ npm run build
 
 ## Cloudflare Pages deployment
 
-1. Create production and preview D1 databases.
-2. Replace the all-zero placeholder IDs in `wrangler.toml` with their IDs.
-3. Apply migrations to each database before deploying.
-4. In Cloudflare Pages, use `npm run build` as the build command and `dist` as
+1. Create a production D1 database and configure it in `wrangler.toml`.
+2. Apply migrations to the production database before deploying.
+3. In Cloudflare Pages, use `npm run build` as the build command and `dist` as
    the output directory.
-5. Bind each environment's D1 database as `DB`.
+4. Bind the production D1 database as `DB`.
+5. Disable preview branch deployments so previews cannot write to production.
 
-Production migration and deployment:
+Apply the production migration:
 
 ```bash
 npm run db:migrate:production
-npm run deploy
 ```
 
-Apply the same migrations to the separately configured preview database with:
-
-```bash
-npm run db:migrate:preview
-```
+Pushes to the production branch are deployed automatically by the Cloudflare
+Pages Git integration.
 
 The profile name is intentionally not authentication. Anyone entering the same
 normalized name receives access to that profile and its study history.

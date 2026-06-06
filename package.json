@@ -11,8 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b tsconfig.app.json tsconfig.functions.json",
-    "db:migrate:local": "wrangler d1 migrations apply study-production --local",
-    "db:migrate:preview": "wrangler d1 migrations apply DB --remote --preview",
+    "db:migrate:local": "wrangler d1 migrations apply study --local",
     "db:migrate:production": "wrangler d1 migrations apply DB --remote",
     "pages:dev": "npm run dev",
     "deploy": "npm run build && wrangler pages deploy dist"

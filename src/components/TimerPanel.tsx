@@ -37,7 +37,7 @@ export function TimerPanel({
       <div className="today-total">
         <span>Today</span>
         <strong>{formatDuration(todaySeconds)}</strong>
-        <small>07:00 to 06:59, Istanbul time</small>
+        <small>06:00 to 05:59, Istanbul time</small>
       </div>
 
       <button

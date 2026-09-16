@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rankLeaderboardSessions } from "../shared/leaderboard";
 
-const rangeStart = Date.parse("2026-06-06T04:00:00Z");
+const rangeStart = Date.parse("2026-06-06T03:00:00Z");
 const rangeEnd = Date.parse("2026-06-06T10:00:00Z");
 
 describe("leaderboard ranking", () => {
@@ -30,7 +30,7 @@ describe("leaderboard ranking", () => {
       name: user.displayName,
       totalSeconds,
     }))).toEqual([
-      { rank: 1, name: "Ada", totalSeconds: 7200 },
+      { rank: 1, name: "Ada", totalSeconds: 10_800 },
       { rank: 2, name: "Batu", totalSeconds: 3600 },
     ]);
   });

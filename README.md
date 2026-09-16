@@ -7,7 +7,7 @@ Functions, and Cloudflare D1.
 
 - Name-only shared profiles, remembered on the current device
 - Studying/resting state with server-authoritative live timing
-- Daily totals using a 07:00 to 06:59 `Europe/Istanbul` study day
+- Daily totals using a 06:00 to 05:59 `Europe/Istanbul` study day
 - Monthly calendar history with session counts
 - Today and current-month leaderboards with live-session totals
 - Sessions that continue across page closures and devices

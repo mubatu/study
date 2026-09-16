@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import type {
   DashboardResponse,
@@ -35,7 +35,7 @@ const dashboard: DashboardResponse = {
 const todayLeaderboard: LeaderboardResponse = {
   serverTime: "2026-06-06T10:00:00.000Z",
   period: "today",
-  periodStart: "2026-06-06T04:00:00.000Z",
+  periodStart: "2026-06-06T03:00:00.000Z",
   periodEnd: "2026-06-06T10:00:00.000Z",
   entries: [
     {
@@ -62,7 +62,7 @@ const todayLeaderboard: LeaderboardResponse = {
 const monthLeaderboard: LeaderboardResponse = {
   ...todayLeaderboard,
   period: "month",
-  periodStart: "2026-06-01T04:00:00.000Z",
+  periodStart: "2026-06-01T03:00:00.000Z",
   entries: [
     {
       rank: 1,
@@ -81,8 +81,13 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse(dashboard.serverTime));
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("App", () => {

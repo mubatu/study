@@ -1,5 +1,5 @@
 export const STUDY_TIME_ZONE = "Europe/Istanbul";
-export const STUDY_DAY_START_HOUR = 7;
+export const STUDY_DAY_START_HOUR = 6;
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: STUDY_TIME_ZONE,

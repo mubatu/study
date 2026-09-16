@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rankLeaderboardSessions } from "../shared/leaderboard";
 
-const rangeStart = Date.parse("2026-06-06T04:00:00Z");
+const rangeStart = Date.parse("2026-06-06T03:00:00Z");
 const rangeEnd = Date.parse("2026-06-06T10:00:00Z");
 
 describe("leaderboard ranking", () => {
@@ -30,7 +30,7 @@ describe("leaderboard ranking", () => {
       name: user.displayName,
       totalSeconds,
     }))).toEqual([
-      { rank: 1, name: "Ada", totalSeconds: 7200 },
+      { rank: 1, name: "Ada", totalSeconds: 10_800 },
       { rank: 2, name: "Batu", totalSeconds: 3600 },
     ]);
   });
@@ -94,5 +94,57 @@ describe("leaderboard ranking", () => {
     );
 
     expect(entries).toEqual([]);
+  });
+
+  it("caps each continuous session at three hours", () => {
+    const entries = rankLeaderboardSessions(
+      [
+        {
+          user_id: "ada",
+          display_name: "Ada",
+          started_at_ms: rangeStart,
+          ended_at_ms: rangeStart + 8 * 60 * 60 * 1000,
+        },
+      ],
+      rangeStart,
+      rangeStart + 8 * 60 * 60 * 1000,
+    );
+
+    expect(entries[0]?.totalSeconds).toBe(3 * 60 * 60);
+  });
+
+  it("includes positive and negative manual adjustments in rankings", () => {
+    const entries = rankLeaderboardSessions(
+      [
+        {
+          user_id: "ada",
+          display_name: "Ada",
+          started_at_ms: rangeStart,
+          ended_at_ms: rangeStart + 2 * 60 * 60 * 1000,
+        },
+      ],
+      rangeStart,
+      rangeEnd,
+      [
+        {
+          user_id: "ada",
+          display_name: "Ada",
+          delta_seconds: -30 * 60,
+        },
+        {
+          user_id: "batu",
+          display_name: "Batu",
+          delta_seconds: 3 * 60 * 60,
+        },
+      ],
+    );
+
+    expect(entries.map((entry) => ({
+      name: entry.user.displayName,
+      seconds: entry.totalSeconds,
+    }))).toEqual([
+      { name: "Batu", seconds: 3 * 60 * 60 },
+      { name: "Ada", seconds: 90 * 60 },
+    ]);
   });
 });

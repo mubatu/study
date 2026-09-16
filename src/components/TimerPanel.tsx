@@ -27,7 +27,7 @@ export function TimerPanel({
 
       <div className="timer-block">
         <p className="timer-label">
-          {studying ? "Current session" : "Ready when you are"}
+          {studying ? "Current session · 3h max" : "Ready when you are"}
         </p>
         <time className="timer-value" aria-label={`${activeSeconds} seconds`}>
           {formatClock(studying ? activeSeconds : 0)}
@@ -37,7 +37,7 @@ export function TimerPanel({
       <div className="today-total">
         <span>Today</span>
         <strong>{formatDuration(todaySeconds)}</strong>
-        <small>07:00 to 06:59, Istanbul time</small>
+        <small>06:00 to 05:59, Istanbul time</small>
       </div>
 
       <button

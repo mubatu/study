@@ -1,10 +1,17 @@
 import type { LeaderboardEntry } from "./contracts";
+import { cappedSessionEndMs } from "./studyTime";
 
 export interface LeaderboardSessionRow {
   user_id: string;
   display_name: string;
   started_at_ms: number;
   ended_at_ms: number | null;
+}
+
+export interface LeaderboardAdjustmentRow {
+  user_id: string;
+  display_name: string;
+  delta_seconds: number;
 }
 
 interface RankedTotal {
@@ -18,6 +25,7 @@ export function rankLeaderboardSessions(
   rows: LeaderboardSessionRow[],
   rangeStartMs: number,
   rangeEndMs: number,
+  adjustments: LeaderboardAdjustmentRow[] = [],
 ): LeaderboardEntry[] {
   const totals = new Map<
     string,
@@ -26,7 +34,11 @@ export function rankLeaderboardSessions(
 
   for (const row of rows) {
     const overlapStart = Math.max(row.started_at_ms, rangeStartMs);
-    const overlapEnd = Math.min(row.ended_at_ms ?? rangeEndMs, rangeEndMs);
+    const sessionEndMs = cappedSessionEndMs(
+      row.started_at_ms,
+      row.ended_at_ms ?? rangeEndMs,
+    );
+    const overlapEnd = Math.min(sessionEndMs, rangeEndMs);
 
     if (overlapEnd <= overlapStart) continue;
 
@@ -38,6 +50,16 @@ export function rankLeaderboardSessions(
     current.totalMs += overlapEnd - overlapStart;
     current.isStudying ||= row.ended_at_ms === null;
     totals.set(row.user_id, current);
+  }
+
+  for (const adjustment of adjustments) {
+    const current = totals.get(adjustment.user_id) ?? {
+      displayName: adjustment.display_name,
+      totalMs: 0,
+      isStudying: false,
+    };
+    current.totalMs += adjustment.delta_seconds * 1000;
+    totals.set(adjustment.user_id, current);
   }
 
   const sorted: RankedTotal[] = [...totals.entries()]

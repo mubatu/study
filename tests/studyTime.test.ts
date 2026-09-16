@@ -7,37 +7,37 @@ import {
 } from "../shared/studyTime";
 
 describe("study day boundaries", () => {
-  it("assigns 06:59 and 07:00 Istanbul time to different days", () => {
-    expect(studyDayKeyForInstant(Date.parse("2026-06-06T03:59:59Z"))).toBe(
+  it("assigns 05:59 and 06:00 Istanbul time to different days", () => {
+    expect(studyDayKeyForInstant(Date.parse("2026-06-06T02:59:59Z"))).toBe(
       "2026-06-05",
     );
-    expect(studyDayKeyForInstant(Date.parse("2026-06-06T04:00:00Z"))).toBe(
+    expect(studyDayKeyForInstant(Date.parse("2026-06-06T03:00:00Z"))).toBe(
       "2026-06-06",
     );
   });
 
   it("returns exact UTC bounds for an Istanbul study day", () => {
     expect(studyDayBounds("2026-06-06")).toEqual({
-      startMs: Date.parse("2026-06-06T04:00:00Z"),
-      endMs: Date.parse("2026-06-07T04:00:00Z"),
+      startMs: Date.parse("2026-06-06T03:00:00Z"),
+      endMs: Date.parse("2026-06-07T03:00:00Z"),
     });
   });
 
   it("returns month bounds based on study days, not midnight", () => {
     expect(monthBounds("2026-06")).toEqual({
-      startMs: Date.parse("2026-06-01T04:00:00Z"),
-      endMs: Date.parse("2026-07-01T04:00:00Z"),
+      startMs: Date.parse("2026-06-01T03:00:00Z"),
+      endMs: Date.parse("2026-07-01T03:00:00Z"),
     });
   });
 });
 
 describe("session aggregation", () => {
-  it("splits a session at 07:00", () => {
+  it("splits a session at 06:00", () => {
     const result = aggregateSessions([
       {
         id: "session-1",
-        startMs: Date.parse("2026-06-06T03:30:00Z"),
-        endMs: Date.parse("2026-06-06T04:30:00Z"),
+        startMs: Date.parse("2026-06-06T02:30:00Z"),
+        endMs: Date.parse("2026-06-06T03:30:00Z"),
       },
     ]);
 
@@ -53,7 +53,7 @@ describe("session aggregation", () => {
     });
   });
 
-  it("splits a multi-day session across every study day", () => {
+  it("caps a continuous session at three hours", () => {
     const result = aggregateSessions([
       {
         id: "long-session",
@@ -62,9 +62,9 @@ describe("session aggregation", () => {
       },
     ]);
 
-    expect(result.get("2026-06-05")?.totalSeconds).toBe(6 * 3600);
-    expect(result.get("2026-06-06")?.totalSeconds).toBe(24 * 3600);
-    expect(result.get("2026-06-07")?.totalSeconds).toBe(6 * 3600);
+    expect(result.get("2026-06-05")?.totalSeconds).toBe(3 * 3600);
+    expect(result.has("2026-06-06")).toBe(false);
+    expect(result.has("2026-06-07")).toBe(false);
   });
 
   it("combines sessions and counts each contribution", () => {

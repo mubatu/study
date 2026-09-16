@@ -1,5 +1,7 @@
 export const STUDY_TIME_ZONE = "Europe/Istanbul";
-export const STUDY_DAY_START_HOUR = 7;
+export const STUDY_DAY_START_HOUR = 6;
+export const MAX_SESSION_DURATION_SECONDS = 3 * 60 * 60;
+export const MAX_SESSION_DURATION_MS = MAX_SESSION_DURATION_SECONDS * 1000;
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: STUDY_TIME_ZONE,
@@ -31,6 +33,10 @@ export interface AggregatedDay {
   date: string;
   totalSeconds: number;
   sessionCount: number;
+}
+
+export function cappedSessionEndMs(startMs: number, endMs: number): number {
+  return Math.min(endMs, startMs + MAX_SESSION_DURATION_MS);
 }
 
 function getZonedParts(timestampMs: number): DateParts {
@@ -167,11 +173,12 @@ export function aggregateSessions(
     }
 
     let cursor = session.startMs;
+    const cappedEndMs = cappedSessionEndMs(session.startMs, session.endMs);
 
-    while (cursor < session.endMs) {
+    while (cursor < cappedEndMs) {
       const date = studyDayKeyForInstant(cursor);
       const bounds = studyDayBounds(date);
-      const overlapEnd = Math.min(session.endMs, bounds.endMs);
+      const overlapEnd = Math.min(cappedEndMs, bounds.endMs);
       const overlapMs = overlapEnd - cursor;
       const current = raw.get(date) ?? {
         totalMs: 0,

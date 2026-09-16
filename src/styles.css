@@ -31,7 +31,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -40,7 +41,8 @@ button {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+textarea:focus-visible {
   outline: 3px solid rgba(33, 87, 213, 0.24);
   outline-offset: 3px;
 }
@@ -660,6 +662,7 @@ input:focus-visible {
 }
 
 .calendar-day {
+  position: relative;
   display: flex;
   align-items: center;
   flex-direction: column;
@@ -671,6 +674,16 @@ input:focus-visible {
   color: var(--muted);
   background: transparent;
   cursor: pointer;
+}
+
+.calendar-note-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--coral);
 }
 
 .calendar-date {
@@ -708,15 +721,22 @@ input:focus-visible {
   color: rgba(255, 255, 255, 0.78);
 }
 
+.calendar-day--selected .calendar-note-dot {
+  background: white;
+}
+
+.day-details {
+  margin-top: 17px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
 .day-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-top: 17px;
   padding: 17px 1px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
 }
 
 .day-summary p {
@@ -736,9 +756,227 @@ input:focus-visible {
   white-space: nowrap;
 }
 
+.day-note {
+  padding: 0 1px 17px;
+}
+
+.day-note-heading,
+.day-note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.day-note-heading {
+  margin-bottom: 8px;
+}
+
+.day-note-heading label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.day-note-heading span,
+.day-note-actions span,
+.day-note-actions p {
+  margin: 0;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.day-note textarea {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 13px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  outline: 0;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.day-note textarea:focus {
+  border-color: #9bb4ef;
+  box-shadow: 0 0 0 3px rgba(33, 87, 213, 0.08);
+}
+
+.day-note textarea::placeholder {
+  color: var(--faint);
+}
+
+.day-note textarea:disabled {
+  opacity: 0.68;
+}
+
+.day-note-actions {
+  min-height: 36px;
+  margin-top: 9px;
+}
+
+.day-note-actions p {
+  color: #a63f2d;
+}
+
+.day-note-actions button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  background: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.day-note-actions button:disabled {
+  color: var(--faint);
+  background: #edf0f5;
+  cursor: default;
+}
+
 .profile-disclaimer {
   margin: 21px auto 0;
   text-align: center;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.adjustment-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: 24px;
+  background: rgba(23, 32, 51, 0.42);
+}
+
+.adjustment-sheet {
+  width: min(100%, 460px);
+  padding: 10px 22px max(22px, env(safe-area-inset-bottom));
+  border-radius: 24px 24px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -18px 55px rgba(23, 32, 51, 0.2);
+}
+
+.adjustment-handle {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 20px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.adjustment-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.adjustment-heading h2 {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 25px;
+  letter-spacing: -0.035em;
+}
+
+.adjustment-close {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.adjustment-description {
+  margin: 15px 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.adjustment-sheet form > label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.adjustment-sheet input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  outline: 0;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.adjustment-sheet input:focus {
+  border-color: #9bb4ef;
+  box-shadow: 0 0 0 3px rgba(33, 87, 213, 0.08);
+}
+
+.adjustment-sheet input::placeholder {
+  color: var(--faint);
+}
+
+.adjustment-error {
+  margin: 10px 2px 0;
+  color: #a63f2d;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.adjustment-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.adjustment-actions button {
+  min-height: 52px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.adjustment-remove {
+  border: 1px solid #efb5aa;
+  color: var(--coral-dark);
+  background: #fff4f1;
+}
+
+.adjustment-add {
+  border: 1px solid var(--blue);
+  color: white;
+  background: var(--blue);
+}
+
+.adjustment-actions button:disabled,
+.adjustment-close:disabled {
+  cursor: wait;
+  opacity: 0.48;
 }
 
 .error-message {

@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 import type {
   DashboardResponse,
@@ -30,12 +30,13 @@ const dashboard: DashboardResponse = {
       sessionCount: 2,
     },
   ],
+  notes: [],
 };
 
 const todayLeaderboard: LeaderboardResponse = {
   serverTime: "2026-06-06T10:00:00.000Z",
   period: "today",
-  periodStart: "2026-06-06T04:00:00.000Z",
+  periodStart: "2026-06-06T03:00:00.000Z",
   periodEnd: "2026-06-06T10:00:00.000Z",
   entries: [
     {
@@ -62,7 +63,7 @@ const todayLeaderboard: LeaderboardResponse = {
 const monthLeaderboard: LeaderboardResponse = {
   ...todayLeaderboard,
   period: "month",
-  periodStart: "2026-06-01T04:00:00.000Z",
+  periodStart: "2026-06-01T03:00:00.000Z",
   entries: [
     {
       rank: 1,
@@ -81,8 +82,13 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse(dashboard.serverTime));
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("App", () => {
@@ -183,5 +189,163 @@ describe("App", () => {
     expect(
       screen.getByText("Study during this period to join the ranking."),
     ).toBeInTheDocument();
+  });
+
+  it("caps an active session and today's total at three hours", async () => {
+    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
+    const cappedDashboard: DashboardResponse = {
+      ...dashboard,
+      state: "studying",
+      activeSince: "2026-06-06T06:00:00.000Z",
+      currentDay: { ...dashboard.currentDay, totalSeconds: 10_800 },
+      days: [{ ...dashboard.days[0], totalSeconds: 10_800 }],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) =>
+        Promise.resolve(
+          String(input).startsWith("/api/leaderboard")
+            ? jsonResponse(todayLeaderboard)
+            : jsonResponse(cappedDashboard),
+        ),
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("03:00:00")).toBeInTheDocument();
+    expect(screen.getByText("Current session · 3h max")).toBeInTheDocument();
+    expect(
+      screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
+    ).toHaveTextContent("3h");
+  });
+
+  it("edits and saves a note for the selected day", async () => {
+    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
+    const notedDashboard: DashboardResponse = {
+      ...dashboard,
+      notes: [{ date: "2026-06-06", text: "Read chapter 4" }],
+    };
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.startsWith("/api/leaderboard")) {
+          return jsonResponse(todayLeaderboard);
+        }
+        if (url === "/api/note") {
+          const request = JSON.parse(String(init?.body));
+          return jsonResponse({ date: request.date, text: request.text });
+        }
+        return jsonResponse(notedDashboard);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    const note = await screen.findByLabelText("Daily note");
+    expect(note).toHaveValue("Read chapter 4");
+    expect(
+      screen.getByRole("button", {
+        name: /Saturday, June 6, 2026, 3h 42m, note added/i,
+      }),
+    ).toBeInTheDocument();
+
+    await user.clear(note);
+    await user.type(note, "Practice limits");
+    await user.click(screen.getByRole("button", { name: "Save note" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/note",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            userId: profile.id,
+            date: "2026-06-06",
+            text: "Practice limits",
+          }),
+        }),
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
+  });
+
+  it("opens hidden controls on long press and adds minutes", async () => {
+    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
+    let adjusted = false;
+    const adjustedDashboard: DashboardResponse = {
+      ...dashboard,
+      currentDay: {
+        ...dashboard.currentDay,
+        totalSeconds: 15_120,
+        sessionCount: 3,
+      },
+      days: [
+        {
+          ...dashboard.days[0],
+          totalSeconds: 15_120,
+          sessionCount: 3,
+        },
+      ],
+    };
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/adjustment") {
+          adjusted = true;
+          return jsonResponse(adjustedDashboard.currentDay);
+        }
+        if (url.startsWith("/api/leaderboard")) {
+          return jsonResponse(todayLeaderboard);
+        }
+        if (url.startsWith("/api/dashboard")) {
+          return jsonResponse(adjusted ? adjustedDashboard : dashboard);
+        }
+        return jsonResponse(dashboard);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText("Studying as");
+
+    const disclaimer = screen.getByText(
+      "This profile is public to anyone using the same name.",
+    );
+    fireEvent.pointerDown(disclaimer);
+
+    expect(
+      await screen.findByRole(
+        "dialog",
+        { name: "Adjust today" },
+        { timeout: 1_500 },
+      ),
+    ).toBeInTheDocument();
+    fireEvent.pointerUp(disclaimer);
+
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
+    await user.type(screen.getByLabelText("Minutes"), "30");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/adjustment",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            userId: profile.id,
+            minutes: 30,
+            operation: "add",
+          }),
+        }),
+      ),
+    );
+    expect(await screen.findByText("3 sessions")).toBeInTheDocument();
+    expect(
+      screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
+    ).toHaveTextContent("4h 12m");
   });
 });

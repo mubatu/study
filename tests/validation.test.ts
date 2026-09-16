@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import { HttpError } from "../functions/_shared/http";
 import {
   normalizeProfileName,
+  normalizeDailyNote,
   requireLeaderboardPeriod,
+  requireAdjustmentMinutes,
+  requireAdjustmentOperation,
   requireMonth,
+  requireStudyDate,
   requireUserId,
 } from "../functions/_shared/validation";
 
@@ -34,13 +38,39 @@ describe("API parameter validation", () => {
       "123e4567-e89b-42d3-a456-426614174000",
     );
     expect(requireMonth("2026-06")).toBe("2026-06");
+    expect(requireStudyDate("2026-06-06")).toBe("2026-06-06");
     expect(requireLeaderboardPeriod("today")).toBe("today");
     expect(requireLeaderboardPeriod("month")).toBe("month");
+    expect(requireAdjustmentMinutes(30)).toBe(30);
+    expect(requireAdjustmentOperation("add")).toBe("add");
+    expect(requireAdjustmentOperation("remove")).toBe("remove");
   });
 
   it("rejects malformed values", () => {
     expect(() => requireUserId("not-an-id")).toThrow(HttpError);
     expect(() => requireMonth("2026-13")).toThrow(HttpError);
+    expect(() => requireStudyDate("2026-02-30")).toThrow(HttpError);
     expect(() => requireLeaderboardPeriod("week")).toThrow(HttpError);
+    expect(() => requireAdjustmentMinutes(0)).toThrow(HttpError);
+    expect(() => requireAdjustmentMinutes(1.5)).toThrow(HttpError);
+    expect(() => requireAdjustmentMinutes(1441)).toThrow(HttpError);
+    expect(() => requireAdjustmentOperation("replace")).toThrow(HttpError);
+  });
+});
+
+describe("daily note normalization", () => {
+  it("normalizes line endings and trims outer whitespace", () => {
+    expect(normalizeDailyNote("  Calculus\r\nPractice  ")).toBe(
+      "Calculus\nPractice",
+    );
+  });
+
+  it("allows an empty note for removal", () => {
+    expect(normalizeDailyNote("   ")).toBe("");
+  });
+
+  it("rejects oversized and control-character notes", () => {
+    expect(() => normalizeDailyNote("a".repeat(241))).toThrow(HttpError);
+    expect(() => normalizeDailyNote("Study\u0000note")).toThrow(HttpError);
   });
 });

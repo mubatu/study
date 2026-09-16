@@ -189,4 +189,33 @@ describe("App", () => {
       screen.getByText("Study during this period to join the ranking."),
     ).toBeInTheDocument();
   });
+
+  it("caps an active session and today's total at three hours", async () => {
+    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
+    const cappedDashboard: DashboardResponse = {
+      ...dashboard,
+      state: "studying",
+      activeSince: "2026-06-06T06:00:00.000Z",
+      currentDay: { ...dashboard.currentDay, totalSeconds: 10_800 },
+      days: [{ ...dashboard.days[0], totalSeconds: 10_800 }],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) =>
+        Promise.resolve(
+          String(input).startsWith("/api/leaderboard")
+            ? jsonResponse(todayLeaderboard)
+            : jsonResponse(cappedDashboard),
+        ),
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("03:00:00")).toBeInTheDocument();
+    expect(screen.getByText("Current session · 3h max")).toBeInTheDocument();
+    expect(
+      screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
+    ).toHaveTextContent("3h");
+  });
 });

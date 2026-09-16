@@ -53,7 +53,7 @@ describe("session aggregation", () => {
     });
   });
 
-  it("splits a multi-day session across every study day", () => {
+  it("caps a continuous session at three hours", () => {
     const result = aggregateSessions([
       {
         id: "long-session",
@@ -62,9 +62,9 @@ describe("session aggregation", () => {
       },
     ]);
 
-    expect(result.get("2026-06-05")?.totalSeconds).toBe(5 * 3600);
-    expect(result.get("2026-06-06")?.totalSeconds).toBe(24 * 3600);
-    expect(result.get("2026-06-07")?.totalSeconds).toBe(7 * 3600);
+    expect(result.get("2026-06-05")?.totalSeconds).toBe(3 * 3600);
+    expect(result.has("2026-06-06")).toBe(false);
+    expect(result.has("2026-06-07")).toBe(false);
   });
 
   it("combines sessions and counts each contribution", () => {

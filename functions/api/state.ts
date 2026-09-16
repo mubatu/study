@@ -1,4 +1,5 @@
 import type { StateResponse, StudyState } from "../../shared/contracts";
+import { MAX_SESSION_DURATION_MS } from "../../shared/studyTime";
 import { getUser } from "../_shared/dashboard";
 import type { Env } from "../_shared/env";
 import { handleError, HttpError, json, readJson } from "../_shared/http";
@@ -40,11 +41,11 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     } else {
       await context.env.DB.prepare(
         `UPDATE study_sessions
-            SET ended_at_ms = ?
+            SET ended_at_ms = MIN(?, started_at_ms + ?)
           WHERE user_id = ?
             AND ended_at_ms IS NULL`,
       )
-        .bind(nowMs, userId)
+        .bind(nowMs, MAX_SESSION_DURATION_MS, userId)
         .run();
     }
 

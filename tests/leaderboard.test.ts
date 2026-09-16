@@ -95,4 +95,21 @@ describe("leaderboard ranking", () => {
 
     expect(entries).toEqual([]);
   });
+
+  it("caps each continuous session at three hours", () => {
+    const entries = rankLeaderboardSessions(
+      [
+        {
+          user_id: "ada",
+          display_name: "Ada",
+          started_at_ms: rangeStart,
+          ended_at_ms: rangeStart + 8 * 60 * 60 * 1000,
+        },
+      ],
+      rangeStart,
+      rangeStart + 8 * 60 * 60 * 1000,
+    );
+
+    expect(entries[0]?.totalSeconds).toBe(3 * 60 * 60);
+  });
 });

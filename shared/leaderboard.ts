@@ -1,4 +1,5 @@
 import type { LeaderboardEntry } from "./contracts";
+import { cappedSessionEndMs } from "./studyTime";
 
 export interface LeaderboardSessionRow {
   user_id: string;
@@ -26,7 +27,11 @@ export function rankLeaderboardSessions(
 
   for (const row of rows) {
     const overlapStart = Math.max(row.started_at_ms, rangeStartMs);
-    const overlapEnd = Math.min(row.ended_at_ms ?? rangeEndMs, rangeEndMs);
+    const sessionEndMs = cappedSessionEndMs(
+      row.started_at_ms,
+      row.ended_at_ms ?? rangeEndMs,
+    );
+    const overlapEnd = Math.min(sessionEndMs, rangeEndMs);
 
     if (overlapEnd <= overlapStart) continue;
 

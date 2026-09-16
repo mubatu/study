@@ -5,7 +5,11 @@ import type {
   LeaderboardResponse,
   UserProfile,
 } from "../shared/contracts";
-import { studyDayKeyForInstant, studyDayBounds } from "../shared/studyTime";
+import {
+  MAX_SESSION_DURATION_MS,
+  studyDayKeyForInstant,
+  studyDayBounds,
+} from "../shared/studyTime";
 import { Leaderboard } from "./components/Leaderboard";
 import { StudyCalendar } from "./components/StudyCalendar";
 import { TimerPanel } from "./components/TimerPanel";
@@ -169,21 +173,36 @@ function App() {
     if (!dashboard) return { activeSeconds: 0, todaySeconds: 0 };
 
     const serverMs = new Date(dashboard.serverTime).getTime();
-    const elapsedSinceSnapshot = Math.max(
-      0,
-      Math.floor((clockMs - snapshotReceivedAt) / 1000),
-    );
-    const activeSeconds = dashboard.activeSince
-      ? Math.floor(
-          (serverMs - new Date(dashboard.activeSince).getTime()) / 1000,
-        ) + elapsedSinceSnapshot
-      : 0;
+    const elapsedSinceSnapshotMs = Math.max(0, clockMs - snapshotReceivedAt);
+    const activeSinceMs = dashboard.activeSince
+      ? new Date(dashboard.activeSince).getTime()
+      : null;
+    const sessionAgeAtSnapshotMs =
+      activeSinceMs === null ? 0 : Math.max(0, serverMs - activeSinceMs);
+    const activeSeconds =
+      activeSinceMs === null
+        ? 0
+        : Math.floor(
+            Math.min(
+              sessionAgeAtSnapshotMs + elapsedSinceSnapshotMs,
+              MAX_SESSION_DURATION_MS,
+            ) / 1000,
+          );
+    const creditedSinceSnapshotSeconds =
+      dashboard.state === "studying" && activeSinceMs !== null
+        ? Math.floor(
+            Math.min(
+              elapsedSinceSnapshotMs,
+              Math.max(0, MAX_SESSION_DURATION_MS - sessionAgeAtSnapshotMs),
+            ) / 1000,
+          )
+        : 0;
 
     return {
       activeSeconds,
       todaySeconds:
         dashboard.currentDay.totalSeconds +
-        (dashboard.state === "studying" ? elapsedSinceSnapshot : 0),
+        creditedSinceSnapshotSeconds,
     };
   }, [clockMs, dashboard, snapshotReceivedAt]);
 

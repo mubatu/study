@@ -4,9 +4,11 @@ import type {
 } from "../../shared/contracts";
 import {
   rankLeaderboardSessions,
+  type LeaderboardAdjustmentRow,
   type LeaderboardSessionRow,
 } from "../../shared/leaderboard";
 import {
+  addCalendarDays,
   monthBounds,
   studyDayBounds,
   studyDayKeyForInstant,
@@ -26,8 +28,20 @@ export async function buildLeaderboard(
       ? studyDayBounds(currentDay).startMs
       : monthBounds(currentDay.slice(0, 7)).startMs;
   const rangeEndMs = nowMs;
+  const rangeStartDate =
+    period === "today" ? currentDay : `${currentDay.slice(0, 7)}-01`;
+  const rangeEndDate =
+    period === "today"
+      ? addCalendarDays(currentDay, 1)
+      : (() => {
+          const [year, month] = currentDay.slice(0, 7).split("-").map(Number);
+          const nextMonth = new Date(Date.UTC(year, month, 1));
+          return `${nextMonth.getUTCFullYear()}-${(nextMonth.getUTCMonth() + 1)
+            .toString()
+            .padStart(2, "0")}-01`;
+        })();
 
-  const [, result] = await Promise.all([
+  const [, result, adjustmentResult] = await Promise.all([
     getUser(env, userId),
     env.DB.prepare(
       `SELECT
@@ -42,12 +56,26 @@ export async function buildLeaderboard(
     )
       .bind(rangeEndMs, rangeStartMs)
       .all<LeaderboardSessionRow>(),
+    env.DB.prepare(
+      `SELECT
+         adjustments.user_id,
+         users.display_name,
+         SUM(adjustments.delta_seconds) AS delta_seconds
+       FROM study_adjustments AS adjustments
+       INNER JOIN users ON users.id = adjustments.user_id
+       WHERE adjustments.study_date >= ?
+         AND adjustments.study_date < ?
+       GROUP BY adjustments.user_id, users.display_name`,
+    )
+      .bind(rangeStartDate, rangeEndDate)
+      .all<LeaderboardAdjustmentRow>(),
   ]);
 
   const ranked = rankLeaderboardSessions(
     result.results,
     rangeStartMs,
     rangeEndMs,
+    adjustmentResult.results,
   );
 
   return {

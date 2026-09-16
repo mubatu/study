@@ -33,6 +33,8 @@ export interface StateResponse {
   activeSince: string | null;
 }
 
+export type StudyAdjustmentOperation = "add" | "remove";
+
 export type LeaderboardPeriod = "today" | "month";
 
 export interface LeaderboardEntry {

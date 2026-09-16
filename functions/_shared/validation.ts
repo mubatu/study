@@ -1,6 +1,8 @@
 import { HttpError } from "./http";
 import type { LeaderboardPeriod } from "../../shared/contracts";
 import { MAX_DAILY_NOTE_LENGTH } from "../../shared/dailyNotes";
+import { MAX_ADJUSTMENT_MINUTES } from "../../shared/adjustments";
+import type { StudyAdjustmentOperation } from "../../shared/contracts";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -109,5 +111,31 @@ export function requireLeaderboardPeriod(input: unknown): LeaderboardPeriod {
   if (input !== "today" && input !== "month") {
     throw new HttpError(400, "Period must be today or month.");
   }
+  return input;
+}
+
+export function requireAdjustmentMinutes(input: unknown): number {
+  if (
+    typeof input !== "number" ||
+    !Number.isInteger(input) ||
+    input < 1 ||
+    input > MAX_ADJUSTMENT_MINUTES
+  ) {
+    throw new HttpError(
+      400,
+      `Minutes must be a whole number between 1 and ${MAX_ADJUSTMENT_MINUTES}.`,
+    );
+  }
+
+  return input;
+}
+
+export function requireAdjustmentOperation(
+  input: unknown,
+): StudyAdjustmentOperation {
+  if (input !== "add" && input !== "remove") {
+    throw new HttpError(400, "Operation must be add or remove.");
+  }
+
   return input;
 }

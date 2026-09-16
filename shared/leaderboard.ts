@@ -8,6 +8,12 @@ export interface LeaderboardSessionRow {
   ended_at_ms: number | null;
 }
 
+export interface LeaderboardAdjustmentRow {
+  user_id: string;
+  display_name: string;
+  delta_seconds: number;
+}
+
 interface RankedTotal {
   userId: string;
   displayName: string;
@@ -19,6 +25,7 @@ export function rankLeaderboardSessions(
   rows: LeaderboardSessionRow[],
   rangeStartMs: number,
   rangeEndMs: number,
+  adjustments: LeaderboardAdjustmentRow[] = [],
 ): LeaderboardEntry[] {
   const totals = new Map<
     string,
@@ -43,6 +50,16 @@ export function rankLeaderboardSessions(
     current.totalMs += overlapEnd - overlapStart;
     current.isStudying ||= row.ended_at_ms === null;
     totals.set(row.user_id, current);
+  }
+
+  for (const adjustment of adjustments) {
+    const current = totals.get(adjustment.user_id) ?? {
+      displayName: adjustment.display_name,
+      totalMs: 0,
+      isStudying: false,
+    };
+    current.totalMs += adjustment.delta_seconds * 1000;
+    totals.set(adjustment.user_id, current);
   }
 
   const sorted: RankedTotal[] = [...totals.entries()]

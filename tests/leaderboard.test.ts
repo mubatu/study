@@ -112,4 +112,39 @@ describe("leaderboard ranking", () => {
 
     expect(entries[0]?.totalSeconds).toBe(3 * 60 * 60);
   });
+
+  it("includes positive and negative manual adjustments in rankings", () => {
+    const entries = rankLeaderboardSessions(
+      [
+        {
+          user_id: "ada",
+          display_name: "Ada",
+          started_at_ms: rangeStart,
+          ended_at_ms: rangeStart + 2 * 60 * 60 * 1000,
+        },
+      ],
+      rangeStart,
+      rangeEnd,
+      [
+        {
+          user_id: "ada",
+          display_name: "Ada",
+          delta_seconds: -30 * 60,
+        },
+        {
+          user_id: "batu",
+          display_name: "Batu",
+          delta_seconds: 3 * 60 * 60,
+        },
+      ],
+    );
+
+    expect(entries.map((entry) => ({
+      name: entry.user.displayName,
+      seconds: entry.totalSeconds,
+    }))).toEqual([
+      { name: "Batu", seconds: 3 * 60 * 60 },
+      { name: "Ada", seconds: 90 * 60 },
+    ]);
+  });
 });

@@ -1,8 +1,16 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type {
   DashboardResponse,
   LeaderboardPeriod,
   LeaderboardResponse,
+  StudyAdjustmentOperation,
   UserProfile,
 } from "../shared/contracts";
 import {
@@ -12,9 +20,11 @@ import {
 } from "../shared/studyTime";
 import { Leaderboard } from "./components/Leaderboard";
 import { StudyCalendar } from "./components/StudyCalendar";
+import { StudyAdjustmentSheet } from "./components/StudyAdjustmentSheet";
 import { TimerPanel } from "./components/TimerPanel";
 import { BookMark } from "./components/Icons";
 import {
+  adjustStudyTime,
   getDashboard,
   getLeaderboard,
   openProfile,
@@ -24,6 +34,7 @@ import {
 import { currentStudyMonth } from "./lib/format";
 
 const STORAGE_KEY = "study-timer.profile.v1";
+const ADJUSTMENT_LONG_PRESS_MS = 700;
 
 function loadSavedProfile(): UserProfile | null {
   try {
@@ -57,9 +68,13 @@ function App() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [notePending, setNotePending] = useState(false);
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+  const [adjustmentPending, setAdjustmentPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const adjustmentPressTimer = useRef<number | null>(null);
 
   const applyDashboard = useCallback((next: DashboardResponse) => {
     setDashboard(next);
@@ -171,6 +186,15 @@ function App() {
 
     return () => window.clearTimeout(timeout);
   }, [profile, refresh, refreshLeaderboard, dashboard?.serverTime]);
+
+  useEffect(
+    () => () => {
+      if (adjustmentPressTimer.current !== null) {
+        window.clearTimeout(adjustmentPressTimer.current);
+      }
+    },
+    [],
+  );
 
   const liveValues = useMemo(() => {
     if (!dashboard) return { activeSeconds: 0, todaySeconds: 0 };
@@ -306,6 +330,60 @@ function App() {
     }
   }
 
+  function cancelAdjustmentPress() {
+    if (adjustmentPressTimer.current !== null) {
+      window.clearTimeout(adjustmentPressTimer.current);
+      adjustmentPressTimer.current = null;
+    }
+  }
+
+  function startAdjustmentPress() {
+    cancelAdjustmentPress();
+    adjustmentPressTimer.current = window.setTimeout(() => {
+      setAdjustmentError(null);
+      setAdjustmentOpen(true);
+      adjustmentPressTimer.current = null;
+    }, ADJUSTMENT_LONG_PRESS_MS);
+  }
+
+  async function handleAdjustment(
+    operation: StudyAdjustmentOperation,
+    minutes: number,
+  ) {
+    if (!profile) return;
+    setAdjustmentPending(true);
+    setAdjustmentError(null);
+
+    try {
+      await adjustStudyTime(profile.id, minutes, operation);
+      const [dashboardResult, leaderboardResult] = await Promise.allSettled([
+        getDashboard(profile.id, month),
+        getLeaderboard(profile.id, leaderboardPeriod),
+      ]);
+
+      if (dashboardResult.status === "rejected") {
+        throw dashboardResult.reason;
+      }
+
+      applyDashboard(dashboardResult.value);
+      if (leaderboardResult.status === "fulfilled") {
+        setLeaderboard(leaderboardResult.value);
+        setLeaderboardError(null);
+      } else {
+        setLeaderboardError("Could not refresh the leaderboard.");
+      }
+      setAdjustmentOpen(false);
+    } catch (requestError) {
+      setAdjustmentError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not adjust today's study time.",
+      );
+    } finally {
+      setAdjustmentPending(false);
+    }
+  }
+
   function handleChangeUser() {
     localStorage.removeItem(STORAGE_KEY);
     setProfile(null);
@@ -313,6 +391,8 @@ function App() {
     setLeaderboard(null);
     setError(null);
     setNoteError(null);
+    setAdjustmentOpen(false);
+    setAdjustmentError(null);
     setLeaderboardError(null);
   }
 
@@ -429,9 +509,26 @@ function App() {
             }}
             onSaveNote={handleSaveNote}
           />
-          <p className="profile-disclaimer">
+          <p
+            className="profile-disclaimer"
+            onPointerDown={startAdjustmentPress}
+            onPointerUp={cancelAdjustmentPress}
+            onPointerCancel={cancelAdjustmentPress}
+            onPointerLeave={cancelAdjustmentPress}
+            onContextMenu={(event) => event.preventDefault()}
+          >
             This profile is public to anyone using the same name.
           </p>
+          {adjustmentOpen ? (
+            <StudyAdjustmentSheet
+              pending={adjustmentPending}
+              error={adjustmentError}
+              onClose={() => {
+                if (!adjustmentPending) setAdjustmentOpen(false);
+              }}
+              onAdjust={handleAdjustment}
+            />
+          ) : null}
         </>
       ) : (
         <div className="loading-state" aria-live="polite">

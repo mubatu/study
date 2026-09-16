@@ -4,6 +4,8 @@ import {
   normalizeProfileName,
   normalizeDailyNote,
   requireLeaderboardPeriod,
+  requireAdjustmentMinutes,
+  requireAdjustmentOperation,
   requireMonth,
   requireStudyDate,
   requireUserId,
@@ -39,6 +41,9 @@ describe("API parameter validation", () => {
     expect(requireStudyDate("2026-06-06")).toBe("2026-06-06");
     expect(requireLeaderboardPeriod("today")).toBe("today");
     expect(requireLeaderboardPeriod("month")).toBe("month");
+    expect(requireAdjustmentMinutes(30)).toBe(30);
+    expect(requireAdjustmentOperation("add")).toBe("add");
+    expect(requireAdjustmentOperation("remove")).toBe("remove");
   });
 
   it("rejects malformed values", () => {
@@ -46,6 +51,10 @@ describe("API parameter validation", () => {
     expect(() => requireMonth("2026-13")).toThrow(HttpError);
     expect(() => requireStudyDate("2026-02-30")).toThrow(HttpError);
     expect(() => requireLeaderboardPeriod("week")).toThrow(HttpError);
+    expect(() => requireAdjustmentMinutes(0)).toThrow(HttpError);
+    expect(() => requireAdjustmentMinutes(1.5)).toThrow(HttpError);
+    expect(() => requireAdjustmentMinutes(1441)).toThrow(HttpError);
+    expect(() => requireAdjustmentOperation("replace")).toThrow(HttpError);
   });
 });
 

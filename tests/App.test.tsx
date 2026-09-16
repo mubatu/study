@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
@@ -270,5 +270,82 @@ describe("App", () => {
       ),
     );
     expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
+  });
+
+  it("opens hidden controls on long press and adds minutes", async () => {
+    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
+    let adjusted = false;
+    const adjustedDashboard: DashboardResponse = {
+      ...dashboard,
+      currentDay: {
+        ...dashboard.currentDay,
+        totalSeconds: 15_120,
+        sessionCount: 3,
+      },
+      days: [
+        {
+          ...dashboard.days[0],
+          totalSeconds: 15_120,
+          sessionCount: 3,
+        },
+      ],
+    };
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/adjustment") {
+          adjusted = true;
+          return jsonResponse(adjustedDashboard.currentDay);
+        }
+        if (url.startsWith("/api/leaderboard")) {
+          return jsonResponse(todayLeaderboard);
+        }
+        if (url.startsWith("/api/dashboard")) {
+          return jsonResponse(adjusted ? adjustedDashboard : dashboard);
+        }
+        return jsonResponse(dashboard);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText("Studying as");
+
+    const disclaimer = screen.getByText(
+      "This profile is public to anyone using the same name.",
+    );
+    fireEvent.pointerDown(disclaimer);
+
+    expect(
+      await screen.findByRole(
+        "dialog",
+        { name: "Adjust today" },
+        { timeout: 1_500 },
+      ),
+    ).toBeInTheDocument();
+    fireEvent.pointerUp(disclaimer);
+
+    expect(screen.getByRole("button", { name: "Remove" })).toBeDisabled();
+    await user.type(screen.getByLabelText("Minutes"), "30");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/adjustment",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            userId: profile.id,
+            minutes: 30,
+            operation: "add",
+          }),
+        }),
+      ),
+    );
+    expect(await screen.findByText("3 sessions")).toBeInTheDocument();
+    expect(
+      screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
+    ).toHaveTextContent("4h 12m");
   });
 });

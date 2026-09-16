@@ -1,10 +1,12 @@
 import type {
   ApiError,
   DailyNote,
+  DailyTotal,
   DashboardResponse,
   LeaderboardPeriod,
   LeaderboardResponse,
   StateResponse,
+  StudyAdjustmentOperation,
   StudyState,
   UserProfile,
 } from "../../shared/contracts";
@@ -72,5 +74,16 @@ export function saveDailyNote(
   return request<DailyNote>("/api/note", {
     method: "PUT",
     body: JSON.stringify({ userId, date, text }),
+  });
+}
+
+export function adjustStudyTime(
+  userId: string,
+  minutes: number,
+  operation: StudyAdjustmentOperation,
+): Promise<DailyTotal> {
+  return request<DailyTotal>("/api/adjustment", {
+    method: "PUT",
+    body: JSON.stringify({ userId, minutes, operation }),
   });
 }

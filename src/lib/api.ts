@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  DailyNote,
   DashboardResponse,
   LeaderboardPeriod,
   LeaderboardResponse,
@@ -60,5 +61,16 @@ export function setStudyState(
   return request<StateResponse>("/api/state", {
     method: "PUT",
     body: JSON.stringify({ userId, state }),
+  });
+}
+
+export function saveDailyNote(
+  userId: string,
+  date: string,
+  text: string,
+): Promise<DailyNote> {
+  return request<DailyNote>("/api/note", {
+    method: "PUT",
+    body: JSON.stringify({ userId, date, text }),
   });
 }

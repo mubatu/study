@@ -18,6 +18,7 @@ import {
   getDashboard,
   getLeaderboard,
   openProfile,
+  saveDailyNote,
   setStudyState,
 } from "./lib/api";
 import { currentStudyMonth } from "./lib/format";
@@ -55,7 +56,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [pending, setPending] = useState(false);
+  const [notePending, setNotePending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 
   const applyDashboard = useCallback((next: DashboardResponse) => {
@@ -268,12 +271,48 @@ function App() {
     }
   }
 
+  async function handleSaveNote(date: string, text: string) {
+    if (!profile) return;
+    setNotePending(true);
+    setNoteError(null);
+
+    try {
+      const savedNote = await saveDailyNote(profile.id, date, text);
+      setDashboard((current) => {
+        if (!current || current.month !== savedNote.date.slice(0, 7)) {
+          return current;
+        }
+
+        const otherNotes = current.notes.filter(
+          (note) => note.date !== savedNote.date,
+        );
+        return {
+          ...current,
+          notes: savedNote.text
+            ? [...otherNotes, savedNote].sort((a, b) =>
+                a.date.localeCompare(b.date),
+              )
+            : otherNotes,
+        };
+      });
+    } catch (requestError) {
+      setNoteError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not save your note.",
+      );
+    } finally {
+      setNotePending(false);
+    }
+  }
+
   function handleChangeUser() {
     localStorage.removeItem(STORAGE_KEY);
     setProfile(null);
     setDashboard(null);
     setLeaderboard(null);
     setError(null);
+    setNoteError(null);
     setLeaderboardError(null);
   }
 
@@ -373,14 +412,22 @@ function App() {
           <StudyCalendar
             month={month}
             days={dashboard.days}
+            notes={dashboard.notes}
             selectedDate={visibleSelectedDate}
             currentDate={currentDate}
             loading={loading}
+            notePending={notePending}
+            noteError={noteError}
             onMonthChange={(nextMonth) => {
               setMonth(nextMonth);
               setSelectedDate(`${nextMonth}-01`);
+              setNoteError(null);
             }}
-            onSelectDate={setSelectedDate}
+            onSelectDate={(date) => {
+              setSelectedDate(date);
+              setNoteError(null);
+            }}
+            onSaveNote={handleSaveNote}
           />
           <p className="profile-disclaimer">
             This profile is public to anyone using the same name.

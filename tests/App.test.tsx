@@ -30,6 +30,7 @@ const dashboard: DashboardResponse = {
       sessionCount: 2,
     },
   ],
+  notes: [],
 };
 
 const todayLeaderboard: LeaderboardResponse = {
@@ -217,5 +218,57 @@ describe("App", () => {
     expect(
       screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
     ).toHaveTextContent("3h");
+  });
+
+  it("edits and saves a note for the selected day", async () => {
+    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
+    const notedDashboard: DashboardResponse = {
+      ...dashboard,
+      notes: [{ date: "2026-06-06", text: "Read chapter 4" }],
+    };
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.startsWith("/api/leaderboard")) {
+          return jsonResponse(todayLeaderboard);
+        }
+        if (url === "/api/note") {
+          const request = JSON.parse(String(init?.body));
+          return jsonResponse({ date: request.date, text: request.text });
+        }
+        return jsonResponse(notedDashboard);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    const note = await screen.findByLabelText("Daily note");
+    expect(note).toHaveValue("Read chapter 4");
+    expect(
+      screen.getByRole("button", {
+        name: /Saturday, June 6, 2026, 3h 42m, note added/i,
+      }),
+    ).toBeInTheDocument();
+
+    await user.clear(note);
+    await user.type(note, "Practice limits");
+    await user.click(screen.getByRole("button", { name: "Save note" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/note",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            userId: profile.id,
+            date: "2026-06-06",
+            text: "Practice limits",
+          }),
+        }),
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Saved" })).toBeDisabled();
   });
 });

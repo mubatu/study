@@ -1,5 +1,6 @@
 import type {
   DashboardResponse,
+  DailyNote,
   DailyTotal,
   UserProfile,
 } from "../../shared/contracts";
@@ -21,6 +22,11 @@ interface SessionRow {
   id: string;
   started_at_ms: number;
   ended_at_ms: number | null;
+}
+
+interface NoteRow {
+  study_date: string;
+  note: string;
 }
 
 export async function getUser(
@@ -53,16 +59,27 @@ export async function buildDashboard(
   const rangeStart = Math.min(currentBounds.startMs, requestedBounds.startMs);
   const rangeEnd = Math.max(currentBounds.endMs, requestedBounds.endMs);
 
-  const result = await env.DB.prepare(
-    `SELECT id, started_at_ms, ended_at_ms
-       FROM study_sessions
-      WHERE user_id = ?
-        AND started_at_ms < ?
-        AND (ended_at_ms IS NULL OR ended_at_ms > ?)
-      ORDER BY started_at_ms`,
-  )
-    .bind(userId, rangeEnd, rangeStart)
-    .all<SessionRow>();
+  const [result, noteResult] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id, started_at_ms, ended_at_ms
+         FROM study_sessions
+        WHERE user_id = ?
+          AND started_at_ms < ?
+          AND (ended_at_ms IS NULL OR ended_at_ms > ?)
+        ORDER BY started_at_ms`,
+    )
+      .bind(userId, rangeEnd, rangeStart)
+      .all<SessionRow>(),
+    env.DB.prepare(
+      `SELECT study_date, note
+         FROM daily_notes
+        WHERE user_id = ?
+          AND study_date LIKE ?
+        ORDER BY study_date`,
+    )
+      .bind(userId, `${month}-%`)
+      .all<NoteRow>(),
+  ]);
 
   const sessions = result.results.map((session) => ({
     id: session.id,
@@ -73,6 +90,10 @@ export async function buildDashboard(
   const days: DailyTotal[] = [...totals.values()]
     .filter((day) => day.date.startsWith(month))
     .sort((a, b) => a.date.localeCompare(b.date));
+  const notes: DailyNote[] = noteResult.results.map((note) => ({
+    date: note.study_date,
+    text: note.note,
+  }));
   const openSession = result.results.find(
     (session) => session.ended_at_ms === null,
   );
@@ -92,5 +113,6 @@ export async function buildDashboard(
     currentDay,
     month,
     days,
+    notes,
   };
 }

@@ -11,6 +11,11 @@ export interface DailyTotal {
   sessionCount: number;
 }
 
+export interface DailyNote {
+  date: string;
+  text: string;
+}
+
 export interface DashboardResponse {
   user: UserProfile;
   serverTime: string;
@@ -19,6 +24,7 @@ export interface DashboardResponse {
   currentDay: DailyTotal;
   month: string;
   days: DailyTotal[];
+  notes: DailyNote[];
 }
 
 export interface StateResponse {

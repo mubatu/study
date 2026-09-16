@@ -1,4 +1,6 @@
-import type { DailyTotal } from "../../shared/contracts";
+import { FormEvent, useEffect, useState } from "react";
+import type { DailyNote, DailyTotal } from "../../shared/contracts";
+import { MAX_DAILY_NOTE_LENGTH } from "../../shared/dailyNotes";
 import { ChevronLeft, ChevronRight } from "./Icons";
 import {
   formatDuration,
@@ -10,11 +12,15 @@ import {
 interface StudyCalendarProps {
   month: string;
   days: DailyTotal[];
+  notes: DailyNote[];
   selectedDate: string;
   currentDate: string;
   loading: boolean;
+  notePending: boolean;
+  noteError: string | null;
   onMonthChange: (month: string) => void;
   onSelectDate: (date: string) => void;
+  onSaveNote: (date: string, text: string) => Promise<void>;
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -34,18 +40,37 @@ function getCalendarCells(month: string): Array<number | null> {
 export function StudyCalendar({
   month,
   days,
+  notes,
   selectedDate,
   currentDate,
   loading,
+  notePending,
+  noteError,
   onMonthChange,
   onSelectDate,
+  onSaveNote,
 }: StudyCalendarProps) {
   const totals = new Map(days.map((day) => [day.date, day]));
+  const notesByDate = new Map(notes.map((note) => [note.date, note.text]));
   const selected = totals.get(selectedDate) ?? {
     date: selectedDate,
     totalSeconds: 0,
     sessionCount: 0,
   };
+  const selectedNote = notesByDate.get(selectedDate) ?? "";
+  const [noteDraft, setNoteDraft] = useState(selectedNote);
+  const noteLength = Array.from(noteDraft).length;
+  const noteChanged = noteDraft !== selectedNote;
+
+  useEffect(() => {
+    setNoteDraft(selectedNote);
+  }, [selectedDate, selectedNote]);
+
+  function handleNoteSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!noteChanged || notePending) return;
+    void onSaveNote(selectedDate, noteDraft);
+  }
 
   return (
     <section className="history" aria-labelledby="history-title">
@@ -88,6 +113,7 @@ export function StudyCalendar({
 
             const date = `${month}-${day.toString().padStart(2, "0")}`;
             const total = totals.get(date);
+            const hasNote = notesByDate.has(date);
             const isSelected = date === selectedDate;
             const isToday = date === currentDate;
 
@@ -106,9 +132,12 @@ export function StudyCalendar({
                 aria-pressed={isSelected}
                 aria-label={`${formatLongDate(date)}, ${
                   total ? formatDuration(total.totalSeconds) : "no study time"
-                }`}
+                }${hasNote ? ", note added" : ""}`}
                 onClick={() => onSelectDate(date)}
               >
+                {hasNote ? (
+                  <span className="calendar-note-dot" aria-hidden="true" />
+                ) : null}
                 <span className="calendar-date">{day}</span>
                 <span className="calendar-total">
                   {total?.totalSeconds ? formatDuration(total.totalSeconds) : ""}
@@ -119,18 +148,54 @@ export function StudyCalendar({
         </div>
       </div>
 
-      <div className="day-summary" aria-live="polite">
-        <div>
-          <p>{formatLongDate(selectedDate)}</p>
-          <span>
-            {selected.sessionCount === 0
-              ? "No study sessions"
-              : `${selected.sessionCount} ${
-                  selected.sessionCount === 1 ? "session" : "sessions"
-                }`}
-          </span>
+      <div className="day-details">
+        <div className="day-summary" aria-live="polite">
+          <div>
+            <p>{formatLongDate(selectedDate)}</p>
+            <span>
+              {selected.sessionCount === 0
+                ? "No study sessions"
+                : `${selected.sessionCount} ${
+                    selected.sessionCount === 1 ? "session" : "sessions"
+                  }`}
+            </span>
+          </div>
+          <strong>{formatDuration(selected.totalSeconds)}</strong>
         </div>
-        <strong>{formatDuration(selected.totalSeconds)}</strong>
+
+        <form className="day-note" onSubmit={handleNoteSubmit}>
+          <div className="day-note-heading">
+            <label htmlFor="daily-note">Daily note</label>
+            <span>
+              {noteLength}/{MAX_DAILY_NOTE_LENGTH}
+            </span>
+          </div>
+          <textarea
+            id="daily-note"
+            value={noteDraft}
+            rows={3}
+            maxLength={MAX_DAILY_NOTE_LENGTH}
+            disabled={notePending}
+            placeholder="What did you focus on?"
+            onChange={(event) => setNoteDraft(event.target.value)}
+          />
+          <div className="day-note-actions">
+            {noteError ? (
+              <p role="alert">{noteError}</p>
+            ) : (
+              <span>Shared with this profile</span>
+            )}
+            <button type="submit" disabled={!noteChanged || notePending}>
+              {notePending
+                ? "Saving..."
+                : !noteChanged && selectedNote
+                  ? "Saved"
+                  : !noteDraft.trim() && selectedNote
+                    ? "Remove note"
+                    : "Save note"}
+            </button>
+          </div>
+        </form>
       </div>
     </section>
   );

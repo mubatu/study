@@ -5,6 +5,7 @@ import type {
   DashboardResponse,
   LeaderboardPeriod,
   LeaderboardResponse,
+  MonthlyActivityResponse,
   StateResponse,
   StudyAdjustmentOperation,
   StudyState,
@@ -54,6 +55,15 @@ export function getLeaderboard(
 ): Promise<LeaderboardResponse> {
   const params = new URLSearchParams({ userId, period });
   return request<LeaderboardResponse>(`/api/leaderboard?${params}`);
+}
+
+export function getMonthlyActivity(
+  userId: string,
+  month: string,
+  signal?: AbortSignal,
+): Promise<MonthlyActivityResponse> {
+  const params = new URLSearchParams({ userId, month });
+  return request<MonthlyActivityResponse>(`/api/activity?${params}`, { signal });
 }
 
 export function setStudyState(

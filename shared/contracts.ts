@@ -53,6 +53,13 @@ export interface LeaderboardResponse {
   currentUser: LeaderboardEntry | null;
 }
 
+export interface MonthlyActivityResponse {
+  user: UserProfile;
+  serverTime: string;
+  month: string;
+  days: Array<Pick<DailyTotal, "date" | "totalSeconds">>;
+}
+
 export interface ApiError {
   error: string;
 }

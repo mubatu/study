@@ -1,8 +1,12 @@
+import { useState } from "react";
 import type {
   LeaderboardPeriod,
   LeaderboardResponse,
+  UserProfile,
 } from "../../shared/contracts";
-import { formatDuration } from "../lib/format";
+import { currentStudyMonth } from "../lib/format";
+import { LeaderboardRow } from "./LeaderboardRow";
+import { MonthlyActivityDialog } from "./MonthlyActivityDialog";
 
 interface LeaderboardProps {
   data: LeaderboardResponse | null;
@@ -23,6 +27,7 @@ export function Leaderboard({
   onPeriodChange,
   onRetry,
 }: LeaderboardProps) {
+  const [activityUser, setActivityUser] = useState<UserProfile | null>(null);
   const visibleData = data?.period === period ? data : null;
   const currentIsOutsideTop =
     visibleData?.currentUser &&
@@ -84,30 +89,12 @@ export function Leaderboard({
         ) : null}
 
         {visibleData?.entries.map((entry) => (
-          <div
-            className={`leaderboard-row ${
-              entry.user.id === currentUserId ? "leaderboard-row--current" : ""
-            }`}
+          <LeaderboardRow
             key={entry.user.id}
-          >
-            <span className="leaderboard-rank" aria-label={`Rank ${entry.rank}`}>
-              {entry.rank}
-            </span>
-            <div className="leaderboard-person">
-              <strong>{entry.user.displayName}</strong>
-              {entry.isStudying ? (
-                <span className="leaderboard-active">
-                  <i aria-hidden="true" />
-                  Studying now
-                </span>
-              ) : entry.user.id === currentUserId ? (
-                <span>You</span>
-              ) : null}
-            </div>
-            <strong className="leaderboard-time">
-              {formatDuration(entry.totalSeconds)}
-            </strong>
-          </div>
+            entry={entry}
+            currentUserId={currentUserId}
+            onViewActivity={setActivityUser}
+          />
         ))}
 
         {currentIsOutsideTop && visibleData.currentUser ? (
@@ -117,21 +104,11 @@ export function Leaderboard({
               <span />
               <span />
             </div>
-            <div className="leaderboard-row leaderboard-row--current">
-              <span
-                className="leaderboard-rank"
-                aria-label={`Rank ${visibleData.currentUser.rank}`}
-              >
-                {visibleData.currentUser.rank}
-              </span>
-              <div className="leaderboard-person">
-                <strong>{visibleData.currentUser.user.displayName}</strong>
-                <span>You</span>
-              </div>
-              <strong className="leaderboard-time">
-                {formatDuration(visibleData.currentUser.totalSeconds)}
-              </strong>
-            </div>
+            <LeaderboardRow
+              entry={visibleData.currentUser}
+              currentUserId={currentUserId}
+              onViewActivity={setActivityUser}
+            />
           </>
         ) : null}
 
@@ -141,6 +118,21 @@ export function Leaderboard({
           </p>
         ) : null}
       </div>
+      {visibleData?.entries.some((entry) => entry.user.id !== currentUserId) ? (
+        <p className="leaderboard-hint">
+          Press and hold a person to view their monthly hours.
+        </p>
+      ) : null}
+      {activityUser ? (
+        <MonthlyActivityDialog
+          key={activityUser.id}
+          user={activityUser}
+          initialMonth={currentStudyMonth(
+            visibleData ? Date.parse(visibleData.serverTime) : Date.now(),
+          )}
+          onClose={() => setActivityUser(null)}
+        />
+      ) : null}
     </section>
   );
 }

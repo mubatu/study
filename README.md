@@ -69,7 +69,8 @@ before merging a branch that introduces a schema or index change.
 Monthly hours are available at `GET /api/activity?userId=<uuid>&month=YYYY-MM`.
 This endpoint only reads study sessions and time adjustments; it does not return
 daily notes. Hold another person's leaderboard row to open their hours calendar,
-or focus the row and press Enter or Space. The popup supports month navigation.
+or focus the row and press Enter or Space. Both calendars support month navigation
+back to June 2026, the app's launch month.
 
 The profile name is intentionally not authentication. Anyone entering the same
 normalized name receives access to that profile and its study history.

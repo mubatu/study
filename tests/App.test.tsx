@@ -191,6 +191,42 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("stops your history calendar at June 2026", async () => {
+    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/leaderboard")) {
+        return jsonResponse(todayLeaderboard);
+      }
+      const month = new URL(url, "https://study.test").searchParams.get("month");
+      return jsonResponse({ ...dashboard, month });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("June 2026");
+
+    const previous = screen.getByRole("button", { name: "Previous month" });
+    expect(previous).toBeDisabled();
+    await user.click(previous);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await user.click(screen.getByRole("button", { name: "Next month" }));
+    expect(screen.getByText("July 2026")).toBeInTheDocument();
+    expect(previous).toBeEnabled();
+    await user.click(previous);
+    expect(screen.getByText("June 2026")).toBeInTheDocument();
+    expect(previous).toBeDisabled();
+    expect(fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.startsWith("/api/dashboard")))
+      .toEqual([
+        `/api/dashboard?userId=${profile.id}&month=2026-06`,
+        `/api/dashboard?userId=${profile.id}&month=2026-07`,
+        `/api/dashboard?userId=${profile.id}&month=2026-06`,
+      ]);
+  });
+
   it("caps an active session and today's total at three hours", async () => {
     localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
     const cappedDashboard: DashboardResponse = {

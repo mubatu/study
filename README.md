@@ -12,6 +12,7 @@ Functions, and Cloudflare D1.
 - Monthly calendar history with session counts
 - Brief notes attached to individual study days
 - Today and current-month leaderboards with live-session totals
+- Press-and-hold leaderboard profiles to view monthly daily hours without notes
 - Sessions that continue across page closures and devices
 - Idempotent state transitions and one-open-session database enforcement
 
@@ -64,6 +65,11 @@ Pages Git integration.
 The leaderboard is available at
 `GET /api/leaderboard?userId=<uuid>&period=today|month`. Apply new migrations
 before merging a branch that introduces a schema or index change.
+
+Monthly hours are available at `GET /api/activity?userId=<uuid>&month=YYYY-MM`.
+This endpoint only reads study sessions and time adjustments; it does not return
+daily notes. Hold another person's leaderboard row to open their hours calendar,
+or focus the row and press Enter or Space. The popup supports month navigation.
 
 The profile name is intentionally not authentication. Anyone entering the same
 normalized name receives access to that profile and its study history.

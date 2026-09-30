@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import type { DailyNote, DailyTotal } from "../../shared/contracts";
 import { MAX_DAILY_NOTE_LENGTH } from "../../shared/dailyNotes";
 import { ChevronLeft, ChevronRight } from "./Icons";
+import { getCalendarCells, WEEKDAYS } from "../lib/calendar";
 import {
   formatDuration,
   formatLongDate,
@@ -21,20 +22,6 @@ interface StudyCalendarProps {
   onMonthChange: (month: string) => void;
   onSelectDate: (date: string) => void;
   onSaveNote: (date: string, text: string) => Promise<void>;
-}
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-function getCalendarCells(month: string): Array<number | null> {
-  const [year, monthNumber] = month.split("-").map(Number);
-  const firstDay = new Date(Date.UTC(year, monthNumber - 1, 1));
-  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-  const mondayOffset = (firstDay.getUTCDay() + 6) % 7;
-
-  return [
-    ...Array.from<null>({ length: mondayOffset }).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
-  ];
 }
 
 export function StudyCalendar({

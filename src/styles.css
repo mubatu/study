@@ -421,6 +421,36 @@ textarea:focus-visible {
   background: var(--blue-soft);
 }
 
+.leaderboard-row--interactive {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  color: var(--ink);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: pan-y;
+}
+
+.leaderboard-row--interactive:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -3px;
+}
+
+.leaderboard-row--interactive:active {
+  background: var(--blue-soft);
+}
+
+.leaderboard-hint {
+  margin: 10px 3px 0;
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .leaderboard-rank {
   display: grid;
   width: 31px;
@@ -435,17 +465,17 @@ textarea:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.leaderboard-row:nth-of-type(1) .leaderboard-rank {
+.leaderboard-rank--1 {
   color: #755515;
   background: #fff0bd;
 }
 
-.leaderboard-row:nth-of-type(2) .leaderboard-rank {
+.leaderboard-rank--2 {
   color: #566173;
   background: #e8edf4;
 }
 
-.leaderboard-row:nth-of-type(3) .leaderboard-rank {
+.leaderboard-rank--3 {
   color: #8a4e2d;
   background: #f6dfd2;
 }
@@ -908,6 +938,102 @@ textarea:focus-visible {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.activity-dialog {
+  position: fixed;
+  inset: auto 0 0;
+  width: min(100%, 460px);
+  max-width: 100%;
+  max-height: calc(100dvh - 24px);
+  margin: 0 auto;
+  padding: 10px 22px max(22px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  border-radius: 24px 24px 0 0;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 -18px 55px rgba(23, 32, 51, 0.2);
+}
+
+.activity-dialog::backdrop {
+  background: rgba(23, 32, 51, 0.42);
+}
+
+.activity-dialog .adjustment-heading > div {
+  min-width: 0;
+}
+
+.activity-dialog h2 {
+  overflow-wrap: anywhere;
+}
+
+.activity-dialog .adjustment-close {
+  flex-shrink: 0;
+}
+
+.activity-month-heading,
+.activity-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.activity-month-heading {
+  margin: 24px 0 16px;
+}
+
+.activity-month-heading h3 {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 18px;
+}
+
+.activity-total {
+  margin-bottom: 20px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.activity-total span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.activity-total strong {
+  font-family: "Manrope", sans-serif;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-day {
+  text-align: center;
+  cursor: default;
+}
+
+.activity-day .calendar-total {
+  font-size: 9px;
+}
+
+.activity-message,
+.activity-footnote {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.activity-message {
+  margin: 20px 0;
+}
+
+.activity-footnote {
+  margin: 18px 0 0;
+  color: var(--faint);
+  font-size: 11px;
 }
 
 .adjustment-sheet form > label {

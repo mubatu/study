@@ -444,13 +444,6 @@ textarea:focus-visible {
   background: var(--blue-soft);
 }
 
-.leaderboard-hint {
-  margin: 10px 3px 0;
-  color: var(--faint);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 .leaderboard-rank {
   display: grid;
   width: 31px;
@@ -653,6 +646,11 @@ textarea:focus-visible {
 .icon-button svg {
   width: 22px;
   height: 22px;
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .calendar {

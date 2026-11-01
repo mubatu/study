@@ -2,18 +2,21 @@ import { MAX_DAILY_TOTAL_SECONDS } from "../../shared/adjustments";
 import type {
   DailyTotal,
   StudyAdjustmentOperation,
-  UserProfile,
 } from "../../shared/contracts";
 import { studyDayKeyForInstant } from "../../shared/studyTime";
+import type { SessionUser } from "../lib/auth";
 import { buildDashboard } from "../lib/dashboard";
 import type { Env } from "../lib/env";
 import { HttpError, json, readJson } from "../lib/http";
 import {
   requireAdjustmentMinutes,
   requireAdjustmentOperation,
+  requireUserId,
 } from "../lib/validation";
+import { requireAdmin } from "./admin";
 
 interface AdjustmentRequest {
+  userId?: unknown;
   minutes?: unknown;
   operation?: unknown;
 }
@@ -21,10 +24,13 @@ interface AdjustmentRequest {
 export async function putAdjustment(
   request: Request,
   env: Env,
-  user: UserProfile,
+  user: SessionUser,
 ): Promise<Response> {
+  // Manual adjustments change leaderboard totals, so only admins may make them.
+  requireAdmin(user);
   const body = await readJson<AdjustmentRequest>(request);
-  const userId = user.id;
+  const userId =
+    body.userId === undefined ? user.id : requireUserId(body.userId);
   const minutes = requireAdjustmentMinutes(body.minutes);
   const operation: StudyAdjustmentOperation = requireAdjustmentOperation(
     body.operation,

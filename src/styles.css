@@ -1088,6 +1088,25 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
+.adjustment-sheet select {
+  width: 100%;
+  min-height: 50px;
+  margin-bottom: 16px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  outline: 0;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 15px;
+}
+
+.adjustment-sheet select:focus {
+  border-color: #9bb4ef;
+  box-shadow: 0 0 0 3px rgba(33, 87, 213, 0.08);
+}
+
 .adjustment-sheet input {
   width: 100%;
   min-height: 54px;

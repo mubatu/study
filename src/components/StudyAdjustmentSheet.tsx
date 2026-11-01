@@ -1,24 +1,34 @@
 import { FormEvent, useState } from "react";
 import { MAX_ADJUSTMENT_MINUTES } from "../../shared/adjustments";
-import type { StudyAdjustmentOperation } from "../../shared/contracts";
+import type {
+  AdminUserOption,
+  StudyAdjustmentOperation,
+} from "../../shared/contracts";
 
 interface StudyAdjustmentSheetProps {
+  currentUserId: string;
+  // Profiles the admin can adjust; undefined while the list is loading.
+  adminTargets?: AdminUserOption[];
   pending: boolean;
   error: string | null;
   onClose: () => void;
   onAdjust: (
     operation: StudyAdjustmentOperation,
     minutes: number,
+    targetUserId: string,
   ) => Promise<void>;
 }
 
 export function StudyAdjustmentSheet({
+  currentUserId,
+  adminTargets,
   pending,
   error,
   onClose,
   onAdjust,
 }: StudyAdjustmentSheetProps) {
   const [minutesText, setMinutesText] = useState("");
+  const [targetUserId, setTargetUserId] = useState(currentUserId);
   const minutes = Number(minutesText);
   const validMinutes =
     Number.isInteger(minutes) &&
@@ -28,7 +38,7 @@ export function StudyAdjustmentSheet({
   function submitAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (validMinutes && !pending) {
-      void onAdjust("add", minutes);
+      void onAdjust("add", minutes, targetUserId);
     }
   }
 
@@ -60,10 +70,30 @@ export function StudyAdjustmentSheet({
 
         <p className="adjustment-description">
           Enter minutes to add or remove. This also changes today&apos;s session
-          count and leaderboard time.
+          count and leaderboard time for the selected profile.
         </p>
 
         <form onSubmit={submitAdd}>
+          <label htmlFor="adjustment-profile">Profile</label>
+          <select
+            id="adjustment-profile"
+            value={targetUserId}
+            disabled={pending || !adminTargets}
+            onChange={(event) => setTargetUserId(event.target.value)}
+          >
+            {adminTargets ? (
+              adminTargets.map((target) => (
+                <option key={target.id} value={target.id}>
+                  {target.email
+                    ? `${target.displayName} · ${target.email}`
+                    : target.displayName}
+                </option>
+              ))
+            ) : (
+              <option value={currentUserId}>Loading profiles...</option>
+            )}
+          </select>
+
           <label htmlFor="adjustment-minutes">Minutes</label>
           <input
             id="adjustment-minutes"
@@ -89,7 +119,7 @@ export function StudyAdjustmentSheet({
               className="adjustment-remove"
               type="button"
               disabled={!validMinutes || pending}
-              onClick={() => void onAdjust("remove", minutes)}
+              onClick={() => void onAdjust("remove", minutes, targetUserId)}
             >
               {pending ? "Updating..." : "Remove"}
             </button>

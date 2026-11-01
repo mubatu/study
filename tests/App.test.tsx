@@ -87,10 +87,16 @@ type FetchHandler = (
   init?: RequestInit,
 ) => Promise<Response>;
 
-function stubApi(handler: FetchHandler, user: typeof profile | null = profile) {
+function stubApi(
+  handler: FetchHandler,
+  user: typeof profile | null = profile,
+  isAdmin = false,
+) {
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
     String(input) === "/api/auth/session"
-      ? Promise.resolve(jsonResponse({ user, googleClientId: "client-id" }))
+      ? Promise.resolve(
+          jsonResponse({ user, isAdmin, googleClientId: "client-id" }),
+        )
       : handler(input, init),
   );
   vi.stubGlobal("fetch", fetchMock);
@@ -405,6 +411,11 @@ describe("App", () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url === "/api/admin/users") {
+          return jsonResponse({
+            users: [{ ...profile, email: "batu@example.com" }],
+          });
+        }
         if (url === "/api/adjustment") {
           adjusted = true;
           return jsonResponse(adjustedDashboard.currentDay);
@@ -418,13 +429,11 @@ describe("App", () => {
         return jsonResponse(dashboard);
       },
     );
-    stubApi(fetchMock);
+    stubApi(fetchMock, profile, true);
     const user = userEvent.setup();
 
     render(<App />);
-    await screen.findByText("Studying as");
-
-    const disclaimer = screen.getByText(
+    const disclaimer = await screen.findByText(
       "Your name and study hours appear on the shared leaderboard.",
     );
     fireEvent.pointerDown(disclaimer);
@@ -458,5 +467,75 @@ describe("App", () => {
     expect(
       screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
     ).toHaveTextContent("4h 12m");
+  });
+
+  it("lets an admin pick another profile in the hidden controls", async () => {
+    const fetchMock = stubApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/admin/users") {
+          return jsonResponse({
+            users: [
+              { ...profile, email: "batu@example.com" },
+              { id: "gokce", displayName: "Gökçe", email: "gokce@example.com" },
+            ],
+          });
+        }
+        if (url === "/api/adjustment") {
+          return jsonResponse(dashboard.currentDay);
+        }
+        if (url.startsWith("/api/leaderboard")) {
+          return jsonResponse(todayLeaderboard);
+        }
+        return jsonResponse(dashboard);
+      },
+      profile,
+      true,
+    );
+    const user = userEvent.setup();
+
+    render(<App />);
+    const disclaimer = await screen.findByText(
+      "Your name and study hours appear on the shared leaderboard.",
+    );
+    fireEvent.pointerDown(disclaimer);
+    await screen.findByRole("dialog", { name: "Adjust today" }, { timeout: 1_500 });
+    fireEvent.pointerUp(disclaimer);
+
+    const picker = screen.getByLabelText("Profile");
+    await screen.findByRole("option", { name: "Gökçe · gokce@example.com" });
+    expect(picker).toHaveValue(profile.id);
+    await user.selectOptions(picker, "gokce");
+    await user.type(screen.getByLabelText("Minutes"), "45");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/adjustment",
+        expect.objectContaining({
+          body: JSON.stringify({ userId: "gokce", minutes: 45, operation: "add" }),
+        }),
+      ),
+    );
+  });
+
+  it("does not open the hidden controls for regular users", async () => {
+    stubApi(async (input) =>
+      String(input).startsWith("/api/leaderboard")
+        ? jsonResponse(todayLeaderboard)
+        : jsonResponse(dashboard),
+    );
+
+    render(<App />);
+    const disclaimer = await screen.findByText(
+      "Your name and study hours appear on the shared leaderboard.",
+    );
+    fireEvent.pointerDown(disclaimer);
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    fireEvent.pointerUp(disclaimer);
+
+    expect(
+      screen.queryByRole("dialog", { name: "Adjust today" }),
+    ).not.toBeInTheDocument();
   });
 });

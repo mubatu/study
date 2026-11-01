@@ -7,7 +7,16 @@ export interface UserProfile {
 
 export interface AuthSessionResponse {
   user: UserProfile | null;
+  isAdmin: boolean;
   googleClientId: string | null;
+}
+
+export interface AdminUserOption extends UserProfile {
+  email: string;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUserOption[];
 }
 
 export type ProfileSetupMode = "create" | "claim";
@@ -18,7 +27,7 @@ export interface GoogleSignInRequest {
 }
 
 export type GoogleSignInResponse =
-  | { status: "signed_in"; user: UserProfile }
+  | { status: "signed_in"; user: UserProfile; isAdmin: boolean }
   | { status: "needs_profile"; suggestedName: string };
 
 export interface DailyTotal {

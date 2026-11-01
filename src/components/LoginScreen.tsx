@@ -9,7 +9,7 @@ import { BookMark } from "./Icons";
 
 interface LoginScreenProps {
   googleClientId: string | null;
-  onSignedIn: (user: UserProfile) => void;
+  onSignedIn: (user: UserProfile, isAdmin: boolean) => void;
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -37,7 +37,7 @@ export function LoginScreen({ googleClientId, onSignedIn }: LoginScreenProps) {
     try {
       const result = await signInWithGoogle({ credential: nextCredential });
       if (result.status === "signed_in") {
-        onSignedIn(result.user);
+        onSignedIn(result.user, result.isAdmin);
         return;
       }
       setCredential(nextCredential);
@@ -68,7 +68,9 @@ export function LoginScreen({ googleClientId, onSignedIn }: LoginScreenProps) {
         credential,
         profile: { mode: setupMode, name: cleanName },
       });
-      if (result.status === "signed_in") onSignedIn(result.user);
+      if (result.status === "signed_in") {
+        onSignedIn(result.user, result.isAdmin);
+      }
     } catch (requestError) {
       if (isUnauthorized(requestError)) resetSetup();
       setError(errorMessage(requestError, "Could not set up your profile."));

@@ -1,16 +1,31 @@
 import type {
   ApiError,
+  AuthSessionResponse,
   DailyNote,
   DailyTotal,
   DashboardResponse,
+  GoogleSignInRequest,
+  GoogleSignInResponse,
   LeaderboardPeriod,
   LeaderboardResponse,
   MonthlyActivityResponse,
   StateResponse,
   StudyAdjustmentOperation,
   StudyState,
-  UserProfile,
 } from "../../shared/contracts";
+
+export class ApiRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 401;
+}
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -24,7 +39,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const body = (await response.json()) as T | ApiError;
 
   if (!response.ok) {
-    throw new Error(
+    throw new ApiRequestError(
+      response.status,
       typeof body === "object" && body !== null && "error" in body
         ? body.error
         : "Something went wrong.",
@@ -34,26 +50,32 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function openProfile(name: string): Promise<UserProfile> {
-  return request<UserProfile>("/api/profile", {
+export function getSession(): Promise<AuthSessionResponse> {
+  return request<AuthSessionResponse>("/api/auth/session");
+}
+
+export function signInWithGoogle(
+  input: GoogleSignInRequest,
+): Promise<GoogleSignInResponse> {
+  return request<GoogleSignInResponse>("/api/auth/google", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   });
 }
 
-export function getDashboard(
-  userId: string,
-  month: string,
-): Promise<DashboardResponse> {
-  const params = new URLSearchParams({ userId, month });
+export function signOut(): Promise<{ ok: true }> {
+  return request<{ ok: true }>("/api/auth/logout", { method: "POST" });
+}
+
+export function getDashboard(month: string): Promise<DashboardResponse> {
+  const params = new URLSearchParams({ month });
   return request<DashboardResponse>(`/api/dashboard?${params}`);
 }
 
 export function getLeaderboard(
-  userId: string,
   period: LeaderboardPeriod,
 ): Promise<LeaderboardResponse> {
-  const params = new URLSearchParams({ userId, period });
+  const params = new URLSearchParams({ period });
   return request<LeaderboardResponse>(`/api/leaderboard?${params}`);
 }
 
@@ -66,34 +88,26 @@ export function getMonthlyActivity(
   return request<MonthlyActivityResponse>(`/api/activity?${params}`, { signal });
 }
 
-export function setStudyState(
-  userId: string,
-  state: StudyState,
-): Promise<StateResponse> {
+export function setStudyState(state: StudyState): Promise<StateResponse> {
   return request<StateResponse>("/api/state", {
     method: "PUT",
-    body: JSON.stringify({ userId, state }),
+    body: JSON.stringify({ state }),
   });
 }
 
-export function saveDailyNote(
-  userId: string,
-  date: string,
-  text: string,
-): Promise<DailyNote> {
+export function saveDailyNote(date: string, text: string): Promise<DailyNote> {
   return request<DailyNote>("/api/note", {
     method: "PUT",
-    body: JSON.stringify({ userId, date, text }),
+    body: JSON.stringify({ date, text }),
   });
 }
 
 export function adjustStudyTime(
-  userId: string,
   minutes: number,
   operation: StudyAdjustmentOperation,
 ): Promise<DailyTotal> {
   return request<DailyTotal>("/api/adjustment", {
     method: "PUT",
-    body: JSON.stringify({ userId, minutes, operation }),
+    body: JSON.stringify({ minutes, operation }),
   });
 }

@@ -1,5 +1,4 @@
 import {
-  FormEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -22,37 +21,28 @@ import { Leaderboard } from "./components/Leaderboard";
 import { StudyCalendar } from "./components/StudyCalendar";
 import { StudyAdjustmentSheet } from "./components/StudyAdjustmentSheet";
 import { TimerPanel } from "./components/TimerPanel";
+import { LoginScreen } from "./components/LoginScreen";
 import { BookMark } from "./components/Icons";
 import {
   adjustStudyTime,
   getDashboard,
   getLeaderboard,
-  openProfile,
+  getSession,
+  isUnauthorized,
   saveDailyNote,
   setStudyState,
+  signOut,
 } from "./lib/api";
 import { currentStudyMonth } from "./lib/format";
+import { disableGoogleAutoSelect } from "./lib/googleIdentity";
 
-const STORAGE_KEY = "study-timer.profile.v1";
 const ADJUSTMENT_LONG_PRESS_MS = 700;
 
-function loadSavedProfile(): UserProfile | null {
-  try {
-    const value = localStorage.getItem(STORAGE_KEY);
-    if (!value) return null;
-
-    const parsed = JSON.parse(value) as Partial<UserProfile>;
-    return typeof parsed.id === "string" && typeof parsed.displayName === "string"
-      ? { id: parsed.id, displayName: parsed.displayName }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function App() {
-  const [profile, setProfile] = useState<UserProfile | null>(loadSavedProfile);
-  const [name, setName] = useState("");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [month, setMonth] = useState(() => currentStudyMonth());
   const [selectedDate, setSelectedDate] = useState(() =>
     studyDayKeyForInstant(Date.now()),
@@ -76,6 +66,37 @@ function App() {
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const adjustmentPressTimer = useRef<number | null>(null);
 
+  const clearSignedInState = useCallback(() => {
+    setProfile(null);
+    setDashboard(null);
+    setLeaderboard(null);
+    setError(null);
+    setNoteError(null);
+    setAdjustmentOpen(false);
+    setAdjustmentError(null);
+    setLeaderboardError(null);
+  }, []);
+
+  const loadSession = useCallback(async () => {
+    setSessionError(null);
+    try {
+      const session = await getSession();
+      setGoogleClientId(session.googleClientId);
+      setProfile(session.user);
+      setSessionChecked(true);
+    } catch (requestError) {
+      setSessionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not reach Study.",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSession();
+  }, [loadSession]);
+
   const applyDashboard = useCallback((next: DashboardResponse) => {
     setDashboard(next);
     const receivedAt = Date.now();
@@ -90,8 +111,12 @@ function App() {
       if (!quiet) setLoading(true);
 
       try {
-        applyDashboard(await getDashboard(profile.id, month));
+        applyDashboard(await getDashboard(month));
       } catch (requestError) {
+        if (isUnauthorized(requestError)) {
+          clearSignedInState();
+          return;
+        }
         setError(
           requestError instanceof Error
             ? requestError.message
@@ -101,7 +126,7 @@ function App() {
         if (!quiet) setLoading(false);
       }
     },
-    [applyDashboard, month, profile],
+    [applyDashboard, clearSignedInState, month, profile],
   );
 
   const refreshLeaderboard = useCallback(
@@ -110,11 +135,13 @@ function App() {
       if (!quiet) setLeaderboardLoading(true);
 
       try {
-        setLeaderboard(
-          await getLeaderboard(profile.id, leaderboardPeriod),
-        );
+        setLeaderboard(await getLeaderboard(leaderboardPeriod));
         setLeaderboardError(null);
       } catch (requestError) {
+        if (isUnauthorized(requestError)) {
+          clearSignedInState();
+          return;
+        }
         setLeaderboardError(
           requestError instanceof Error
             ? requestError.message
@@ -124,7 +151,7 @@ function App() {
         if (!quiet) setLeaderboardLoading(false);
       }
     },
-    [leaderboardPeriod, profile],
+    [clearSignedInState, leaderboardPeriod, profile],
   );
 
   useEffect(() => {
@@ -233,30 +260,6 @@ function App() {
     };
   }, [clockMs, dashboard, snapshotReceivedAt]);
 
-  async function handleLogin(event: FormEvent) {
-    event.preventDefault();
-    const cleanName = name.trim();
-    if (!cleanName) return;
-
-    setPending(true);
-    setError(null);
-
-    try {
-      const nextProfile = await openProfile(cleanName);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProfile));
-      setProfile(nextProfile);
-      setName("");
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not open that profile.",
-      );
-    } finally {
-      setPending(false);
-    }
-  }
-
   async function handleToggle() {
     if (!profile || !dashboard) return;
     setPending(true);
@@ -264,12 +267,11 @@ function App() {
 
     try {
       await setStudyState(
-        profile.id,
         dashboard.state === "studying" ? "resting" : "studying",
       );
       const [dashboardResult, leaderboardResult] = await Promise.allSettled([
-        getDashboard(profile.id, month),
-        getLeaderboard(profile.id, leaderboardPeriod),
+        getDashboard(month),
+        getLeaderboard(leaderboardPeriod),
       ]);
 
       if (dashboardResult.status === "rejected") {
@@ -285,6 +287,10 @@ function App() {
         setLeaderboardError("Could not refresh the leaderboard.");
       }
     } catch (requestError) {
+      if (isUnauthorized(requestError)) {
+        clearSignedInState();
+        return;
+      }
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -301,7 +307,7 @@ function App() {
     setNoteError(null);
 
     try {
-      const savedNote = await saveDailyNote(profile.id, date, text);
+      const savedNote = await saveDailyNote(date, text);
       setDashboard((current) => {
         if (!current || current.month !== savedNote.date.slice(0, 7)) {
           return current;
@@ -355,10 +361,10 @@ function App() {
     setAdjustmentError(null);
 
     try {
-      await adjustStudyTime(profile.id, minutes, operation);
+      await adjustStudyTime(minutes, operation);
       const [dashboardResult, leaderboardResult] = await Promise.allSettled([
-        getDashboard(profile.id, month),
-        getLeaderboard(profile.id, leaderboardPeriod),
+        getDashboard(month),
+        getLeaderboard(leaderboardPeriod),
       ]);
 
       if (dashboardResult.status === "rejected") {
@@ -384,61 +390,41 @@ function App() {
     }
   }
 
-  function handleChangeUser() {
-    localStorage.removeItem(STORAGE_KEY);
-    setProfile(null);
-    setDashboard(null);
-    setLeaderboard(null);
-    setError(null);
-    setNoteError(null);
-    setAdjustmentOpen(false);
-    setAdjustmentError(null);
-    setLeaderboardError(null);
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } catch {
+      // The session cookie expires on its own; still leave the signed-in view.
+    }
+    disableGoogleAutoSelect();
+    clearSignedInState();
+  }
+
+  if (!sessionChecked) {
+    return (
+      <div className="app-shell app-shell--login">
+        {sessionError ? (
+          <div className="loading-state" role="alert">
+            <p>{sessionError}</p>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => void loadSession()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="loading-state" aria-live="polite">
+            <span />
+          </div>
+        )}
+      </div>
+    );
   }
 
   if (!profile) {
-    return (
-      <div className="app-shell app-shell--login">
-        <header className="brand">
-          <BookMark />
-          <span>Study</span>
-        </header>
-        <main className="login-panel">
-          <div>
-            <h1>Make the hours count.</h1>
-            <p>
-              One button to track focused study time, day after day.
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin}>
-            <label htmlFor="name">Your name</label>
-            <div className="name-field">
-              <input
-                id="name"
-                name="name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={40}
-                autoComplete="name"
-                autoFocus
-                placeholder="Enter your name"
-              />
-              <button type="submit" disabled={pending || !name.trim()}>
-                {pending ? "Opening..." : "Continue"}
-              </button>
-            </div>
-          </form>
-
-          {error ? <p className="error-message">{error}</p> : null}
-
-          <p className="privacy-note">
-            Profiles use names only. Anyone who enters the same name can view
-            and update its study history.
-          </p>
-        </main>
-      </div>
-    );
+    return <LoginScreen googleClientId={googleClientId} onSignedIn={setProfile} />;
   }
 
   const currentDate =
@@ -457,8 +443,8 @@ function App() {
             <strong>{profile.displayName}</strong>
           </div>
         </div>
-        <button className="text-button" type="button" onClick={handleChangeUser}>
-          Change user
+        <button className="text-button" type="button" onClick={() => void handleSignOut()}>
+          Sign out
         </button>
       </header>
 
@@ -517,7 +503,7 @@ function App() {
             onPointerLeave={cancelAdjustmentPress}
             onContextMenu={(event) => event.preventDefault()}
           >
-            This profile is public to anyone using the same name.
+            Your name and study hours appear on the shared leaderboard.
           </p>
           {adjustmentOpen ? (
             <StudyAdjustmentSheet

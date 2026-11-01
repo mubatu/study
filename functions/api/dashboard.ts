@@ -1,12 +1,12 @@
-import type { Env } from "../_shared/env";
+import type { AuthData, Env } from "../_shared/env";
 import { buildDashboard } from "../_shared/dashboard";
 import { handleError, json } from "../_shared/http";
-import { requireMonth, requireUserId } from "../_shared/validation";
+import { requireMonth } from "../_shared/validation";
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export const onRequestGet: PagesFunction<Env, string, AuthData> = async (context) => {
   try {
     const url = new URL(context.request.url);
-    const userId = requireUserId(url.searchParams.get("userId"));
+    const userId = context.data.user.id;
     const month = requireMonth(url.searchParams.get("month"));
 
     return json(await buildDashboard(context.env, userId, month));

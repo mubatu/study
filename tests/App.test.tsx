@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
@@ -82,6 +82,39 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+type FetchHandler = (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
+function stubApi(handler: FetchHandler, user: typeof profile | null = profile) {
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+    String(input) === "/api/auth/session"
+      ? Promise.resolve(jsonResponse({ user, googleClientId: "client-id" }))
+      : handler(input, init),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function stubGoogleIdentity() {
+  let callback: ((response: { credential?: string }) => void) | null = null;
+  vi.stubGlobal("google", {
+    accounts: {
+      id: {
+        initialize: vi.fn((config: { callback: typeof callback }) => {
+          callback = config.callback;
+        }),
+        renderButton: vi.fn(),
+        disableAutoSelect: vi.fn(),
+      },
+    },
+  });
+  return {
+    signIn: (credential: string) => callback?.({ credential }),
+  };
+}
+
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(Date.parse(dashboard.serverTime));
 });
@@ -92,58 +125,108 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("opens and remembers a name-only profile", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  it("signs in with Google and links an existing name profile", async () => {
+    const google = stubGoogleIdentity();
+    const fetchMock = stubApi(async (input, init) => {
       const url = String(input);
-      if (url === "/api/profile") return jsonResponse(profile);
+      if (url === "/api/auth/google") {
+        const body = JSON.parse(String(init?.body));
+        return jsonResponse(
+          body.profile
+            ? { status: "signed_in", user: profile }
+            : { status: "needs_profile", suggestedName: "Batu Han" },
+        );
+      }
+      if (url.startsWith("/api/leaderboard")) {
+        return jsonResponse(todayLeaderboard);
+      }
+      return jsonResponse(dashboard);
+    }, null);
+    const user = userEvent.setup();
+
+    render(<App />);
+    expect(
+      await screen.findByText(/only you can change your study history/i),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(window.google?.accounts?.id?.renderButton).toHaveBeenCalled(),
+    );
+
+    act(() => google.signIn("google-token"));
+    await user.click(
+      await screen.findByRole("button", { name: "Yes, link my old profile" }),
+    );
+    await user.type(screen.getByLabelText("The name you used before"), "Batu");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByText("Studying as")).toBeInTheDocument();
+    expect(screen.getAllByText("3h 42m")).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/google",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          credential: "google-token",
+          profile: { mode: "claim", name: "Batu" },
+        }),
+      }),
+    );
+  });
+
+  it("prefills the Google name for a new profile", async () => {
+    const google = stubGoogleIdentity();
+    stubApi(async () =>
+      jsonResponse({ status: "needs_profile", suggestedName: "Batu Han" }),
+    null);
+    const user = userEvent.setup();
+
+    render(<App />);
+    await waitFor(() =>
+      expect(window.google?.accounts?.id?.renderButton).toHaveBeenCalled(),
+    );
+    act(() => google.signIn("google-token"));
+    await user.click(
+      await screen.findByRole("button", { name: "No, I'm new here" }),
+    );
+
+    expect(screen.getByLabelText("Your name")).toHaveValue("Batu Han");
+  });
+
+  it("restores a signed-in session and signs out", async () => {
+    const fetchMock = stubApi(async (input) => {
+      const url = String(input);
+      if (url === "/api/auth/logout") return jsonResponse({ ok: true });
       if (url.startsWith("/api/leaderboard")) {
         return jsonResponse(todayLeaderboard);
       }
       return jsonResponse(dashboard);
     });
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-
-    render(<App />);
-    expect(
-      screen.getByText(/anyone who enters the same name/i),
-    ).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText("Your name"), "Batu");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
-
-    expect(await screen.findByText("Studying as")).toBeInTheDocument();
-    expect(screen.getAllByText("3h 42m")).toHaveLength(4);
-    expect(screen.getByText("Ada")).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("study-timer.profile.v1")!)).toEqual(
-      profile,
-    );
-  });
-
-  it("restores a remembered profile and can change user", async () => {
-    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((input: RequestInfo | URL) =>
-        Promise.resolve(
-          String(input).startsWith("/api/leaderboard")
-            ? jsonResponse(todayLeaderboard)
-            : jsonResponse(dashboard),
-        ),
-      ),
-    );
     const user = userEvent.setup();
 
     render(<App />);
     expect(await screen.findByText("Batu")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Change user" }));
-    expect(screen.getByLabelText("Your name")).toBeInTheDocument();
-    expect(localStorage.getItem("study-timer.profile.v1")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(
+      await screen.findByText(/only you can change your study history/i),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("returns to sign-in when the session has expired", async () => {
+    stubApi(async () => jsonResponse({ error: "Sign in to continue." }, 401));
+
+    render(<App />);
+
+    expect(
+      await screen.findByText(/only you can change your study history/i),
+    ).toBeInTheDocument();
   });
 
   it("keeps the dashboard visible when a refresh fails", async () => {
-    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
     let dashboardRequests = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).startsWith("/api/leaderboard")) {
@@ -154,7 +237,7 @@ describe("App", () => {
         ? jsonResponse(dashboard)
         : jsonResponse({ error: "Network unavailable" }, 503);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubApi(fetchMock);
 
     render(<App />);
     expect(await screen.findAllByText("3h 42m")).toHaveLength(4);
@@ -166,7 +249,6 @@ describe("App", () => {
   });
 
   it("switches between today and monthly leaderboard rankings", async () => {
-    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/api/leaderboard") && url.includes("period=month")) {
@@ -177,7 +259,7 @@ describe("App", () => {
       }
       return jsonResponse(dashboard);
     });
-    vi.stubGlobal("fetch", fetchMock);
+    stubApi(fetchMock);
     const user = userEvent.setup();
 
     render(<App />);
@@ -192,7 +274,6 @@ describe("App", () => {
   });
 
   it("caps an active session and today's total at three hours", async () => {
-    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
     const cappedDashboard: DashboardResponse = {
       ...dashboard,
       state: "studying",
@@ -200,8 +281,7 @@ describe("App", () => {
       currentDay: { ...dashboard.currentDay, totalSeconds: 10_800 },
       days: [{ ...dashboard.days[0], totalSeconds: 10_800 }],
     };
-    vi.stubGlobal(
-      "fetch",
+    stubApi(
       vi.fn((input: RequestInfo | URL) =>
         Promise.resolve(
           String(input).startsWith("/api/leaderboard")
@@ -221,7 +301,6 @@ describe("App", () => {
   });
 
   it("edits and saves a note for the selected day", async () => {
-    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
     const notedDashboard: DashboardResponse = {
       ...dashboard,
       notes: [{ date: "2026-06-06", text: "Read chapter 4" }],
@@ -239,7 +318,7 @@ describe("App", () => {
         return jsonResponse(notedDashboard);
       },
     );
-    vi.stubGlobal("fetch", fetchMock);
+    stubApi(fetchMock);
     const user = userEvent.setup();
 
     render(<App />);
@@ -262,7 +341,6 @@ describe("App", () => {
         expect.objectContaining({
           method: "PUT",
           body: JSON.stringify({
-            userId: profile.id,
             date: "2026-06-06",
             text: "Practice limits",
           }),
@@ -273,7 +351,6 @@ describe("App", () => {
   });
 
   it("opens hidden controls on long press and adds minutes", async () => {
-    localStorage.setItem("study-timer.profile.v1", JSON.stringify(profile));
     let adjusted = false;
     const adjustedDashboard: DashboardResponse = {
       ...dashboard,
@@ -306,14 +383,14 @@ describe("App", () => {
         return jsonResponse(dashboard);
       },
     );
-    vi.stubGlobal("fetch", fetchMock);
+    stubApi(fetchMock);
     const user = userEvent.setup();
 
     render(<App />);
     await screen.findByText("Studying as");
 
     const disclaimer = screen.getByText(
-      "This profile is public to anyone using the same name.",
+      "Your name and study hours appear on the shared leaderboard.",
     );
     fireEvent.pointerDown(disclaimer);
 
@@ -336,7 +413,6 @@ describe("App", () => {
         expect.objectContaining({
           method: "PUT",
           body: JSON.stringify({
-            userId: profile.id,
             minutes: 30,
             operation: "add",
           }),

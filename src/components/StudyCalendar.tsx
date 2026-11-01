@@ -1,5 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
-import type { DailyNote, DailyTotal } from "../../shared/contracts";
+import type {
+  DailyNote,
+  DailyTotal,
+  StudyDayAdjustment,
+  StudySessionSpan,
+} from "../../shared/contracts";
 import { MAX_DAILY_NOTE_LENGTH } from "../../shared/dailyNotes";
 import { ChevronLeft, ChevronRight } from "./Icons";
 import { FIRST_STUDY_MONTH, getCalendarCells, WEEKDAYS } from "../lib/calendar";
@@ -7,12 +12,15 @@ import {
   formatDuration,
   formatLongDate,
   formatMonth,
+  formatTimeOfDay,
   moveMonth,
 } from "../lib/format";
 
 interface StudyCalendarProps {
   month: string;
   days: DailyTotal[];
+  sessions: StudySessionSpan[];
+  adjustments: StudyDayAdjustment[];
   notes: DailyNote[];
   selectedDate: string;
   currentDate: string;
@@ -27,6 +35,8 @@ interface StudyCalendarProps {
 export function StudyCalendar({
   month,
   days,
+  sessions,
+  adjustments,
   notes,
   selectedDate,
   currentDate,
@@ -44,6 +54,12 @@ export function StudyCalendar({
     totalSeconds: 0,
     sessionCount: 0,
   };
+  const selectedSessions = sessions.filter(
+    (session) => session.date === selectedDate,
+  );
+  const selectedAdjustment = adjustments.find(
+    (adjustment) => adjustment.date === selectedDate,
+  );
   const selectedNote = notesByDate.get(selectedDate) ?? "";
   const [noteDraft, setNoteDraft] = useState(selectedNote);
   const noteLength = Array.from(noteDraft).length;
@@ -150,6 +166,44 @@ export function StudyCalendar({
           </div>
           <strong>{formatDuration(selected.totalSeconds)}</strong>
         </div>
+
+        {selectedSessions.length > 0 || selectedAdjustment ? (
+          <ol
+            className="day-sessions"
+            aria-label={`Study sessions on ${formatLongDate(selectedDate)}`}
+          >
+            {selectedSessions.map((session) => {
+              const seconds =
+                (Date.parse(session.endedAt) - Date.parse(session.startedAt)) /
+                1000;
+
+              return (
+                <li key={session.startedAt}>
+                  <span className="day-session-time">
+                    {formatTimeOfDay(session.startedAt)} –{" "}
+                    {session.inProgress ? "now" : formatTimeOfDay(session.endedAt)}
+                  </span>
+                  <span className="day-session-length">
+                    {session.inProgress
+                      ? "In progress"
+                      : seconds < 30
+                        ? "<1m"
+                        : formatDuration(seconds)}
+                  </span>
+                </li>
+              );
+            })}
+            {selectedAdjustment ? (
+              <li className="day-session--adjustment">
+                <span className="day-session-time">Manual adjustment</span>
+                <span className="day-session-length">
+                  {selectedAdjustment.deltaSeconds > 0 ? "+" : "−"}
+                  {formatDuration(Math.abs(selectedAdjustment.deltaSeconds))}
+                </span>
+              </li>
+            ) : null}
+          </ol>
+        ) : null}
 
         <form className="day-note" onSubmit={handleNoteSubmit}>
           <div className="day-note-heading">

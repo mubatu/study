@@ -155,13 +155,18 @@ export function monthBounds(monthKey: string): {
   };
 }
 
-export function aggregateSessions(
+export interface StudyDaySegment {
+  id: string;
+  date: string;
+  startMs: number;
+  endMs: number;
+}
+
+// Caps each session at three hours and splits it at 06:00 study-day boundaries.
+export function splitSessionsByStudyDay(
   sessions: SessionInterval[],
-): Map<string, AggregatedDay> {
-  const raw = new Map<
-    string,
-    { totalMs: number; sessionIds: Set<string> }
-  >();
+): StudyDaySegment[] {
+  const segments: StudyDaySegment[] = [];
 
   for (const session of sessions) {
     if (
@@ -177,19 +182,32 @@ export function aggregateSessions(
 
     while (cursor < cappedEndMs) {
       const date = studyDayKeyForInstant(cursor);
-      const bounds = studyDayBounds(date);
-      const overlapEnd = Math.min(cappedEndMs, bounds.endMs);
-      const overlapMs = overlapEnd - cursor;
-      const current = raw.get(date) ?? {
-        totalMs: 0,
-        sessionIds: new Set<string>(),
-      };
-
-      current.totalMs += overlapMs;
-      current.sessionIds.add(session.id);
-      raw.set(date, current);
+      const overlapEnd = Math.min(cappedEndMs, studyDayBounds(date).endMs);
+      segments.push({ id: session.id, date, startMs: cursor, endMs: overlapEnd });
       cursor = overlapEnd;
     }
+  }
+
+  return segments;
+}
+
+export function aggregateSessions(
+  sessions: SessionInterval[],
+): Map<string, AggregatedDay> {
+  const raw = new Map<
+    string,
+    { totalMs: number; sessionIds: Set<string> }
+  >();
+
+  for (const segment of splitSessionsByStudyDay(sessions)) {
+    const current = raw.get(segment.date) ?? {
+      totalMs: 0,
+      sessionIds: new Set<string>(),
+    };
+
+    current.totalMs += segment.endMs - segment.startMs;
+    current.sessionIds.add(segment.id);
+    raw.set(segment.date, current);
   }
 
   return new Map(

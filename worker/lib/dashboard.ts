@@ -2,11 +2,15 @@ import type {
   DashboardResponse,
   DailyNote,
   DailyTotal,
+  StudyDayAdjustment,
+  StudySessionSpan,
   UserProfile,
 } from "../../shared/contracts";
 import {
   aggregateSessions,
+  MAX_SESSION_DURATION_MS,
   monthBounds,
+  splitSessionsByStudyDay,
   studyDayBounds,
   studyDayKeyForInstant,
 } from "../../shared/studyTime";
@@ -105,6 +109,33 @@ export async function buildDashboard(
     endMs: Math.min(session.ended_at_ms ?? nowMs, nowMs),
   }));
   const totals = aggregateSessions(sessions);
+  const openSessionIds = new Set(
+    result.results
+      .filter(
+        (session) =>
+          session.ended_at_ms === null &&
+          nowMs < session.started_at_ms + MAX_SESSION_DURATION_MS,
+      )
+      .map((session) => session.id),
+  );
+  const sessionSpans: StudySessionSpan[] = splitSessionsByStudyDay(sessions)
+    .filter((segment) => segment.date.startsWith(month))
+    .sort((a, b) => a.startMs - b.startMs)
+    .map((segment) => ({
+      date: segment.date,
+      startedAt: new Date(segment.startMs).toISOString(),
+      endedAt: new Date(segment.endMs).toISOString(),
+      inProgress: openSessionIds.has(segment.id) && segment.endMs === nowMs,
+    }));
+  const adjustments: StudyDayAdjustment[] = adjustmentResult.results
+    .filter(
+      (adjustment) =>
+        adjustment.study_date.startsWith(month) && adjustment.delta_seconds !== 0,
+    )
+    .map((adjustment) => ({
+      date: adjustment.study_date,
+      deltaSeconds: adjustment.delta_seconds,
+    }));
   for (const adjustment of adjustmentResult.results) {
     const current = totals.get(adjustment.study_date) ?? {
       date: adjustment.study_date,
@@ -151,6 +182,8 @@ export async function buildDashboard(
     currentDay,
     month,
     days,
+    sessions: sessionSpans,
+    adjustments,
     notes,
   };
 }

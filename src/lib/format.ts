@@ -23,6 +23,17 @@ export function formatDuration(totalSeconds: number): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
+const timeOfDayFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: STUDY_TIME_ZONE,
+});
+
+export function formatTimeOfDay(isoTime: string): string {
+  return timeOfDayFormatter.format(new Date(isoTime));
+}
+
 export function currentStudyMonth(timestampMs = Date.now()): string {
   return studyDayKeyForInstant(timestampMs).slice(0, 7);
 }

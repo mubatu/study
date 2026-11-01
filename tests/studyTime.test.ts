@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateSessions,
   monthBounds,
+  splitSessionsByStudyDay,
   studyDayBounds,
   studyDayKeyForInstant,
 } from "../shared/studyTime";
@@ -93,5 +94,32 @@ describe("session aggregation", () => {
       { id: "a", startMs: 1_000, endMs: 90_600 },
     ]);
     expect([...result.values()][0].totalSeconds).toBe(90);
+  });
+});
+
+describe("session spans per study day", () => {
+  it("splits at 06:00 and caps at three hours", () => {
+    expect(
+      splitSessionsByStudyDay([
+        {
+          id: "late",
+          startMs: Date.parse("2026-06-06T02:00:00Z"),
+          endMs: Date.parse("2026-06-06T09:00:00Z"),
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "late",
+        date: "2026-06-05",
+        startMs: Date.parse("2026-06-06T02:00:00Z"),
+        endMs: Date.parse("2026-06-06T03:00:00Z"),
+      },
+      {
+        id: "late",
+        date: "2026-06-06",
+        startMs: Date.parse("2026-06-06T03:00:00Z"),
+        endMs: Date.parse("2026-06-06T05:00:00Z"),
+      },
+    ]);
   });
 });

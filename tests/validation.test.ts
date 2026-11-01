@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HttpError } from "../functions/_shared/http";
+import { HttpError } from "../worker/lib/http";
 import {
   normalizeProfileName,
   normalizeDailyNote,
@@ -9,7 +9,7 @@ import {
   requireMonth,
   requireStudyDate,
   requireUserId,
-} from "../functions/_shared/validation";
+} from "../worker/lib/validation";
 
 describe("profile name normalization", () => {
   it("trims and collapses whitespace while preserving display casing", () => {

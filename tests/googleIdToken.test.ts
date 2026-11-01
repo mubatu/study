@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { verifyGoogleIdToken } from "../functions/_shared/googleIdToken";
+import { verifyGoogleIdToken } from "../worker/lib/googleIdToken";
 
 const CLIENT_ID = "client-id.apps.googleusercontent.com";
 const NOW_MS = Date.parse("2026-06-06T10:00:00.000Z");

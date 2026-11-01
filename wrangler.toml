@@ -1,6 +1,20 @@
 name = "study"
-pages_build_output_dir = "./dist"
+main = "worker/index.ts"
 compatibility_date = "2026-05-03"
+# Serve production only from the custom domain. Preview URLs would share the production D1 database.
+routes = [{ pattern = "study.mubatu.com", custom_domain = true }]
+workers_dev = false
+preview_urls = false
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+# Only API calls run the Worker; pages, scripts and /privacy are served directly.
+run_worker_first = ["/api/*"]
+
+[observability]
+enabled = true
 
 [[d1_databases]]
 binding = "DB"

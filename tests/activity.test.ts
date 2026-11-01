@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildMonthlyActivity } from "../functions/_shared/activity";
-import { onRequestGet } from "../functions/api/activity";
-import type { Env } from "../functions/_shared/env";
+import { buildMonthlyActivity } from "../worker/lib/activity";
+import type { Env } from "../worker/lib/env";
+import { getActivity } from "../worker/routes/activity";
 
 const profile = { id: "123e4567-e89b-42d3-a456-426614174000", display_name: "Miniş" };
 const nowMs = Date.parse("2026-06-06T10:00:00Z");
@@ -95,20 +95,18 @@ describe("monthly hours API", () => {
     `userId=${profile.id}`,
   ])("validates the API query before reading data: %s", async (query) => {
     const { env, queries } = createEnv();
-    const response = await onRequestGet({
-      request: new Request(`https://study.test/api/activity?${query}`),
-      env,
-    });
-    expect(response.status).toBe(400);
+    await expect(
+      getActivity(new Request(`https://study.test/api/activity?${query}`), env),
+    ).rejects.toMatchObject({ status: 400 });
     expect(queries).toHaveLength(0);
   });
 
   it("returns hours-only JSON with no caching", async () => {
     const { env } = createEnv();
-    const response = await onRequestGet({
-      request: new Request(`https://study.test/api/activity?userId=${profile.id}&month=2026-06`),
+    const response = await getActivity(
+      new Request(`https://study.test/api/activity?userId=${profile.id}&month=2026-06`),
       env,
-    });
+    );
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(await response.json()).toMatchObject({

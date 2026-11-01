@@ -1,7 +1,7 @@
 # Study Timer
 
-A mobile-first study timer built with React, TypeScript, Cloudflare Pages
-Functions, and Cloudflare D1.
+A mobile-first study timer built with React, TypeScript, a Cloudflare Worker
+with static assets, and Cloudflare D1.
 
 ## Features
 
@@ -26,7 +26,7 @@ npm run dev
 ```
 
 `npm run dev` builds the frontend, applies migrations to Wrangler's persistent
-local D1 database, and serves the complete Pages application at
+local D1 database, and serves the complete application with `wrangler dev` at
 `http://localhost:5173`.
 
 The configured Workers compatibility date intentionally matches the newest date
@@ -51,7 +51,7 @@ will not work in that mode.
 
 The browser receives a Google ID token, `POST /api/auth/google` verifies it and
 sets an `HttpOnly` session cookie that lasts 90 days. Every other `/api/*`
-route requires that cookie (`functions/api/_middleware.ts`) and acts on the
+route requires that cookie (enforced by the router in `worker/index.ts`) and acts on the
 signed-in user; clients never send their own user ID.
 
 On first sign-in a person either creates a new profile or links an existing
@@ -70,23 +70,27 @@ npm run typecheck
 npm run build
 ```
 
-## Cloudflare Pages deployment
+## Cloudflare Workers deployment
 
-1. Create a production D1 database and configure it in `wrangler.toml`.
-2. Apply migrations to the production database before deploying.
-3. In Cloudflare Pages, use `npm run build` as the build command and `dist` as
-   the output directory.
-4. Bind the production D1 database as `DB`.
-5. Disable preview branch deployments so previews cannot write to production.
+The app is a single Worker (`worker/index.ts`) with static assets from `dist/`.
+`wrangler.toml` holds the whole configuration: the `study` Worker name, the
+assets directory with single-page-app fallback, the D1 binding `DB`, and
+`GOOGLE_CLIENT_ID`. Only `/api/*` requests run the Worker; everything else is
+served as a static file.
 
-Apply the production migration:
+1. Apply migrations to the production database before deploying:
 
-```bash
-npm run db:migrate:production
-```
+   ```bash
+   npm run db:migrate:production
+   ```
 
-Pushes to the production branch are deployed automatically by the Cloudflare
-Pages Git integration.
+2. Deploy manually with `npm run deploy`, or connect the repository in
+   Workers Builds with `npm run build` as the build command and
+   `npx wrangler deploy` as the deploy command.
+3. Disable builds for non-production branches. Preview versions share the
+   production D1 binding and could write to it.
+
+Pushes to the production branch are deployed automatically by Workers Builds.
 
 The leaderboard is available at
 `GET /api/leaderboard?period=today|month`. Apply new migrations

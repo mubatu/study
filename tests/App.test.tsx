@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
@@ -30,6 +37,8 @@ const dashboard: DashboardResponse = {
       sessionCount: 2,
     },
   ],
+  sessions: [],
+  adjustments: [],
   notes: [],
 };
 
@@ -339,6 +348,56 @@ describe("App", () => {
     expect(
       screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
     ).toHaveTextContent("3h");
+  });
+
+  it("lists the selected day's session times", async () => {
+    const sessionsDashboard: DashboardResponse = {
+      ...dashboard,
+      state: "studying",
+      activeSince: "2026-06-06T09:15:00.000Z",
+      sessions: [
+        {
+          date: "2026-06-06",
+          startedAt: "2026-06-06T06:00:00.000Z",
+          endedAt: "2026-06-06T07:30:00.000Z",
+          inProgress: false,
+        },
+        {
+          date: "2026-06-06",
+          startedAt: "2026-06-06T09:15:00.000Z",
+          endedAt: "2026-06-06T10:00:00.000Z",
+          inProgress: true,
+        },
+      ],
+      adjustments: [{ date: "2026-06-06", deltaSeconds: 1800 }],
+    };
+    stubApi(async (input) =>
+      String(input).startsWith("/api/leaderboard")
+        ? jsonResponse(todayLeaderboard)
+        : jsonResponse(sessionsDashboard),
+    );
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    const list = await screen.findByRole("list", {
+      name: "Study sessions on Saturday, June 6, 2026",
+    });
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent("09:00 – 10:30");
+    expect(rows[0]).toHaveTextContent("1h 30m");
+    expect(rows[1]).toHaveTextContent("12:15 – now");
+    expect(rows[1]).toHaveTextContent("In progress");
+    expect(rows[2]).toHaveTextContent("Manual adjustment");
+    expect(rows[2]).toHaveTextContent("+30m");
+
+    await user.click(
+      screen.getByRole("button", { name: /Friday, June 5, 2026/ }),
+    );
+    expect(
+      screen.queryByRole("list", { name: /Study sessions on/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("edits and saves a note for the selected day", async () => {

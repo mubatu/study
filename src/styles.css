@@ -831,6 +831,46 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.day-sessions {
+  margin: -5px 0 17px;
+  padding: 0;
+  list-style: none;
+}
+
+.day-sessions li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 1px 9px 14px;
+  border-left: 2px solid var(--blue-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-sessions li + li {
+  border-top: 1px dashed var(--line);
+}
+
+.day-sessions .day-session--adjustment {
+  border-left-style: dashed;
+}
+
+.day-session--adjustment .day-session-time {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.day-session-time {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.day-session-length {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .day-note {
   padding: 0 1px 17px;
 }

@@ -41,6 +41,20 @@ export interface DailyNote {
   text: string;
 }
 
+// One study session's part within a single 06:00-to-06:00 study day.
+export interface StudySessionSpan {
+  date: string;
+  startedAt: string;
+  endedAt: string;
+  inProgress: boolean;
+}
+
+// Net manual change an admin made to a study day's total.
+export interface StudyDayAdjustment {
+  date: string;
+  deltaSeconds: number;
+}
+
 export interface DashboardResponse {
   user: UserProfile;
   serverTime: string;
@@ -49,6 +63,8 @@ export interface DashboardResponse {
   currentDay: DailyTotal;
   month: string;
   days: DailyTotal[];
+  sessions: StudySessionSpan[];
+  adjustments: StudyDayAdjustment[];
   notes: DailyNote[];
 }
 

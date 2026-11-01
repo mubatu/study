@@ -529,6 +529,8 @@ function App() {
           <StudyCalendar
             month={month}
             days={dashboard.days}
+            sessions={dashboard.sessions}
+            adjustments={dashboard.adjustments}
             notes={dashboard.notes}
             selectedDate={visibleSelectedDate}
             currentDate={currentDate}

@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import type { DailyNote, DailyTotal } from "../../shared/contracts";
 import { MAX_DAILY_NOTE_LENGTH } from "../../shared/dailyNotes";
 import { ChevronLeft, ChevronRight } from "./Icons";
-import { getCalendarCells, WEEKDAYS } from "../lib/calendar";
+import { FIRST_STUDY_MONTH, getCalendarCells, WEEKDAYS } from "../lib/calendar";
 import {
   formatDuration,
   formatLongDate,
@@ -71,6 +71,7 @@ export function StudyCalendar({
             className="icon-button"
             type="button"
             aria-label="Previous month"
+            disabled={month <= FIRST_STUDY_MONTH}
             onClick={() => onMonthChange(moveMonth(month, -1))}
           >
             <ChevronLeft />

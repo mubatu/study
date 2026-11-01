@@ -4,7 +4,7 @@ import type {
   UserProfile,
 } from "../../shared/contracts";
 import { getMonthlyActivity } from "../lib/api";
-import { getCalendarCells, WEEKDAYS } from "../lib/calendar";
+import { FIRST_STUDY_MONTH, getCalendarCells, WEEKDAYS } from "../lib/calendar";
 import {
   formatDuration,
   formatLongDate,
@@ -31,7 +31,9 @@ export function MonthlyActivityDialog({
   onClose,
 }: MonthlyActivityDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [month, setMonth] = useState(initialMonth);
+  const [month, setMonth] = useState(() =>
+    initialMonth < FIRST_STUDY_MONTH ? FIRST_STUDY_MONTH : initialMonth,
+  );
   const [retry, setRetry] = useState(0);
   const [request, setRequest] = useState<ActivityRequest | null>(null);
   const visibleRequest = request?.month === month ? request : null;
@@ -130,6 +132,7 @@ export function MonthlyActivityDialog({
             className="icon-button"
             type="button"
             aria-label="Previous activity month"
+            disabled={month <= FIRST_STUDY_MONTH}
             onClick={() => setMonth(moveMonth(month, -1))}
           >
             <ChevronLeft />

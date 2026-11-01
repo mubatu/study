@@ -28,9 +28,12 @@ function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
 
-function renderLeaderboard(period: "today" | "month" = "today") {
+function renderLeaderboard(
+  period: "today" | "month" = "today",
+  serverTime = leaderboard.serverTime,
+) {
   render(<Leaderboard
-    data={{ ...leaderboard, period }}
+    data={{ ...leaderboard, period, serverTime }}
     period={period}
     currentUserId={profile.id}
     loading={false}
@@ -143,30 +146,59 @@ describe("leaderboard monthly activity", () => {
   });
 
   it("loads other months, handles empty history, and ignores stale responses", async () => {
-    let resolveMay!: (response: Response) => void;
+    let resolveJuly!: (response: Response) => void;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes("month=2026-05")) {
-        return new Promise<Response>((resolve) => { resolveMay = resolve; });
+      if (url.includes("month=2026-07")) {
+        return new Promise<Response>((resolve) => { resolveJuly = resolve; });
       }
-      if (url.includes("month=2026-04")) {
-        return jsonResponse({ ...activity, month: "2026-04", days: [] });
+      if (url.includes("month=2026-06")) {
+        return jsonResponse({ ...activity, days: [] });
       }
-      return jsonResponse(activity);
+      return jsonResponse({ ...activity, month: "2026-08", days: [] });
     });
     vi.stubGlobal("fetch", fetchMock);
-    await hold(renderLeaderboard());
+    await hold(renderLeaderboard("today", "2026-08-06T10:00:00Z"));
     const dialog = screen.getByRole("dialog");
     const previous = within(dialog).getByRole("button", { name: "Previous activity month" });
     await act(async () => { fireEvent.click(previous); });
     expect(within(dialog).getByText("Loading study hours...")).toBeInTheDocument();
     expect(within(dialog).queryByRole("list")).not.toBeInTheDocument();
     await act(async () => { fireEvent.click(previous); });
-    expect(within(dialog).getByText("April 2026")).toBeInTheDocument();
+    expect(within(dialog).getByText("June 2026")).toBeInTheDocument();
     expect(within(dialog).getByText("No study hours this month.")).toBeInTheDocument();
-    await act(async () => { resolveMay(jsonResponse({ ...activity, month: "2026-05" })); });
+    await act(async () => { resolveJuly(jsonResponse({ ...activity, month: "2026-07" })); });
     expect(within(dialog).getByText("No study hours this month.")).toBeInTheDocument();
     expect(within(dialog).getAllByRole("listitem")).toHaveLength(30);
+  });
+
+  it("stops at June 2026 and allows navigating forward and back", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const month = new URL(String(input), "https://study.test").searchParams.get("month");
+      return jsonResponse({ ...activity, month, days: [] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await hold(renderLeaderboard());
+    const dialog = screen.getByRole("dialog");
+    const previous = within(dialog).getByRole("button", { name: "Previous activity month" });
+    const next = within(dialog).getByRole("button", { name: "Next activity month" });
+
+    expect(previous).toBeDisabled();
+    await act(async () => { fireEvent.click(previous); });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(within(dialog).getByText("June 2026")).toBeInTheDocument();
+
+    await act(async () => { fireEvent.click(next); });
+    expect(within(dialog).getByText("July 2026")).toBeInTheDocument();
+    expect(previous).toBeEnabled();
+    await act(async () => { fireEvent.click(previous); });
+    expect(within(dialog).getByText("June 2026")).toBeInTheDocument();
+    expect(previous).toBeDisabled();
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/activity?userId=batu&month=2026-06",
+      "/api/activity?userId=batu&month=2026-07",
+      "/api/activity?userId=batu&month=2026-06",
+    ]);
   });
 
   it("shows request failures and can retry", async () => {

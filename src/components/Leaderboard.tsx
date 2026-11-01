@@ -118,11 +118,6 @@ export function Leaderboard({
           </p>
         ) : null}
       </div>
-      {visibleData?.entries.some((entry) => entry.user.id !== currentUserId) ? (
-        <p className="leaderboard-hint">
-          Press and hold a person to view their monthly hours.
-        </p>
-      ) : null}
       {activityUser ? (
         <MonthlyActivityDialog
           key={activityUser.id}

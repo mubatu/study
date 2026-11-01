@@ -1,3 +1,5 @@
+export const FIRST_STUDY_MONTH = "2026-06";
+
 export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function getCalendarCells(month: string): Array<number | null> {

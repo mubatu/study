@@ -171,6 +171,53 @@ textarea:focus-visible {
   margin: 20px 3px 0;
 }
 
+.google-sign-in {
+  min-height: 44px;
+}
+
+.google-button {
+  width: 100%;
+  max-width: 400px;
+}
+
+.profile-setup h2 {
+  margin: 0 0 14px;
+  font-family: "Manrope", sans-serif;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.setup-choices {
+  display: grid;
+  gap: 10px;
+}
+
+.setup-choices button {
+  min-height: 52px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(26, 42, 77, 0.07);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.setup-choices button:hover,
+.setup-choices button:focus-visible {
+  border-color: #9bb4ef;
+}
+
+.profile-setup + .error-message + .text-button,
+.profile-setup + .text-button,
+.profile-setup .text-button {
+  margin-top: 6px;
+  align-self: flex-start;
+}
+
 .profile-header {
   display: flex;
   align-items: center;

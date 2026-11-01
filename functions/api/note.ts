@@ -1,27 +1,19 @@
 import type { DailyNote } from "../../shared/contracts";
-import { getUser } from "../_shared/dashboard";
-import type { Env } from "../_shared/env";
+import type { AuthData, Env } from "../_shared/env";
 import { handleError, json, readJson } from "../_shared/http";
-import {
-  normalizeDailyNote,
-  requireStudyDate,
-  requireUserId,
-} from "../_shared/validation";
+import { normalizeDailyNote, requireStudyDate } from "../_shared/validation";
 
 interface NoteRequest {
-  userId?: unknown;
   date?: unknown;
   text?: unknown;
 }
 
-export const onRequestPut: PagesFunction<Env> = async (context) => {
+export const onRequestPut: PagesFunction<Env, string, AuthData> = async (context) => {
   try {
     const body = await readJson<NoteRequest>(context.request);
-    const userId = requireUserId(body.userId);
+    const userId = context.data.user.id;
     const date = requireStudyDate(body.date);
     const text = normalizeDailyNote(body.text);
-
-    await getUser(context.env, userId);
 
     if (text) {
       await context.env.DB.prepare(

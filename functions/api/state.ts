@@ -1,12 +1,9 @@
 import type { StateResponse, StudyState } from "../../shared/contracts";
 import { MAX_SESSION_DURATION_MS } from "../../shared/studyTime";
-import { getUser } from "../_shared/dashboard";
-import type { Env } from "../_shared/env";
+import type { AuthData, Env } from "../_shared/env";
 import { handleError, HttpError, json, readJson } from "../_shared/http";
-import { requireUserId } from "../_shared/validation";
 
 interface StateRequest {
-  userId?: unknown;
   state?: unknown;
 }
 
@@ -21,14 +18,12 @@ function requireState(input: unknown): StudyState {
   return input;
 }
 
-export const onRequestPut: PagesFunction<Env> = async (context) => {
+export const onRequestPut: PagesFunction<Env, string, AuthData> = async (context) => {
   try {
     const body = await readJson<StateRequest>(context.request);
-    const userId = requireUserId(body.userId);
+    const userId = context.data.user.id;
     const requestedState = requireState(body.state);
     const nowMs = Date.now();
-
-    await getUser(context.env, userId);
 
     if (requestedState === "studying") {
       await context.env.DB.prepare(

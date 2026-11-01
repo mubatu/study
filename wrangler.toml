@@ -7,3 +7,7 @@ binding = "DB"
 database_name = "study"
 database_id = "3a9d7c3c-977d-43e1-82ab-993de4c70bee"
 migrations_dir = "migrations"
+
+[vars]
+# OAuth 2.0 Web client ID from Google Cloud Console. It is public, not a secret.
+GOOGLE_CLIENT_ID = "775579213371-0ekotvgv3a7j9jmndos6vepniss9a7t0.apps.googleusercontent.com"

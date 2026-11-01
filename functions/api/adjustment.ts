@@ -5,24 +5,22 @@ import type {
 } from "../../shared/contracts";
 import { studyDayKeyForInstant } from "../../shared/studyTime";
 import { buildDashboard } from "../_shared/dashboard";
-import type { Env } from "../_shared/env";
+import type { AuthData, Env } from "../_shared/env";
 import { handleError, HttpError, json, readJson } from "../_shared/http";
 import {
   requireAdjustmentMinutes,
   requireAdjustmentOperation,
-  requireUserId,
 } from "../_shared/validation";
 
 interface AdjustmentRequest {
-  userId?: unknown;
   minutes?: unknown;
   operation?: unknown;
 }
 
-export const onRequestPut: PagesFunction<Env> = async (context) => {
+export const onRequestPut: PagesFunction<Env, string, AuthData> = async (context) => {
   try {
     const body = await readJson<AdjustmentRequest>(context.request);
-    const userId = requireUserId(body.userId);
+    const userId = context.data.user.id;
     const minutes = requireAdjustmentMinutes(body.minutes);
     const operation: StudyAdjustmentOperation = requireAdjustmentOperation(
       body.operation,

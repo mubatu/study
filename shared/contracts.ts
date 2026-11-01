@@ -5,6 +5,22 @@ export interface UserProfile {
   displayName: string;
 }
 
+export interface AuthSessionResponse {
+  user: UserProfile | null;
+  googleClientId: string | null;
+}
+
+export type ProfileSetupMode = "create" | "claim";
+
+export interface GoogleSignInRequest {
+  credential: string;
+  profile?: { mode: ProfileSetupMode; name: string };
+}
+
+export type GoogleSignInResponse =
+  | { status: "signed_in"; user: UserProfile }
+  | { status: "needs_profile"; suggestedName: string };
+
 export interface DailyTotal {
   date: string;
   totalSeconds: number;

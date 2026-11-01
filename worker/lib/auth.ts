@@ -4,9 +4,14 @@ import type { Env } from "./env";
 const SESSION_COOKIE = "study_session";
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
+export interface SessionUser extends UserProfile {
+  isAdmin: boolean;
+}
+
 interface SessionUserRow {
   id: string;
   display_name: string;
+  is_admin: number;
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -73,12 +78,12 @@ export async function getSessionUser(
   env: Env,
   request: Request,
   nowMs = Date.now(),
-): Promise<UserProfile | null> {
+): Promise<SessionUser | null> {
   const token = readSessionToken(request);
   if (!token) return null;
 
   const user = await env.DB.prepare(
-    `SELECT users.id, users.display_name
+    `SELECT users.id, users.display_name, users.is_admin
        FROM auth_sessions
        INNER JOIN users ON users.id = auth_sessions.user_id
       WHERE auth_sessions.token_hash = ?
@@ -87,7 +92,13 @@ export async function getSessionUser(
     .bind(await hashToken(token), nowMs)
     .first<SessionUserRow>();
 
-  return user ? { id: user.id, displayName: user.display_name } : null;
+  return user
+    ? {
+        id: user.id,
+        displayName: user.display_name,
+        isAdmin: user.is_admin === 1,
+      }
+    : null;
 }
 
 export async function endSession(env: Env, request: Request): Promise<string> {

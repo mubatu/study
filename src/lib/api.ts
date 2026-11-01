@@ -1,4 +1,5 @@
 import type {
+  AdminUsersResponse,
   ApiError,
   AuthSessionResponse,
   DailyNote,
@@ -102,12 +103,18 @@ export function saveDailyNote(date: string, text: string): Promise<DailyNote> {
   });
 }
 
+export function getAdminUsers(): Promise<AdminUsersResponse> {
+  return request<AdminUsersResponse>("/api/admin/users");
+}
+
+// userId is only sent for admin adjustments of another profile.
 export function adjustStudyTime(
   minutes: number,
   operation: StudyAdjustmentOperation,
+  userId?: string,
 ): Promise<DailyTotal> {
   return request<DailyTotal>("/api/adjustment", {
     method: "PUT",
-    body: JSON.stringify({ minutes, operation }),
+    body: JSON.stringify(userId ? { userId, minutes, operation } : { minutes, operation }),
   });
 }

@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import type {
+  AdminUserOption,
   DashboardResponse,
   LeaderboardPeriod,
   LeaderboardResponse,
@@ -25,6 +26,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { BookMark } from "./components/Icons";
 import {
   adjustStudyTime,
+  getAdminUsers,
   getDashboard,
   getLeaderboard,
   getSession,
@@ -40,6 +42,8 @@ const ADJUSTMENT_LONG_PRESS_MS = 700;
 
 function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminTargets, setAdminTargets] = useState<AdminUserOption[]>();
   const [sessionChecked, setSessionChecked] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
@@ -68,6 +72,8 @@ function App() {
 
   const clearSignedInState = useCallback(() => {
     setProfile(null);
+    setIsAdmin(false);
+    setAdminTargets(undefined);
     setDashboard(null);
     setLeaderboard(null);
     setError(null);
@@ -83,6 +89,7 @@ function App() {
       const session = await getSession();
       setGoogleClientId(session.googleClientId);
       setProfile(session.user);
+      setIsAdmin(session.isAdmin);
       setSessionChecked(true);
     } catch (requestError) {
       setSessionError(
@@ -343,8 +350,10 @@ function App() {
     }
   }
 
+  // The hidden controls change leaderboard totals, so they only open for admins.
   function startAdjustmentPress() {
     cancelAdjustmentPress();
+    if (!isAdmin) return;
     adjustmentPressTimer.current = window.setTimeout(() => {
       setAdjustmentError(null);
       setAdjustmentOpen(true);
@@ -352,16 +361,50 @@ function App() {
     }, ADJUSTMENT_LONG_PRESS_MS);
   }
 
+  useEffect(() => {
+    if (!adjustmentOpen || !profile) return;
+
+    let cancelled = false;
+    setAdminTargets(undefined);
+    getAdminUsers()
+      .then(({ users }) => {
+        if (cancelled) return;
+        setAdminTargets(
+          users.some((user) => user.id === profile.id)
+            ? users
+            : [{ ...profile, email: "" }, ...users],
+        );
+      })
+      .catch((requestError) => {
+        if (cancelled) return;
+        setAdminTargets([{ ...profile, email: "" }]);
+        setAdjustmentError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Could not load profiles.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adjustmentOpen, profile]);
+
   async function handleAdjustment(
     operation: StudyAdjustmentOperation,
     minutes: number,
+    targetUserId: string,
   ) {
     if (!profile) return;
     setAdjustmentPending(true);
     setAdjustmentError(null);
 
     try {
-      await adjustStudyTime(minutes, operation);
+      await adjustStudyTime(
+        minutes,
+        operation,
+        targetUserId === profile.id ? undefined : targetUserId,
+      );
       const [dashboardResult, leaderboardResult] = await Promise.allSettled([
         getDashboard(month),
         getLeaderboard(leaderboardPeriod),
@@ -424,7 +467,15 @@ function App() {
   }
 
   if (!profile) {
-    return <LoginScreen googleClientId={googleClientId} onSignedIn={setProfile} />;
+    return (
+      <LoginScreen
+        googleClientId={googleClientId}
+        onSignedIn={(user, admin) => {
+          setProfile(user);
+          setIsAdmin(admin);
+        }}
+      />
+    );
   }
 
   const currentDate =
@@ -505,8 +556,10 @@ function App() {
           >
             Your name and study hours appear on the shared leaderboard.
           </p>
-          {adjustmentOpen ? (
+          {adjustmentOpen && isAdmin ? (
             <StudyAdjustmentSheet
+              currentUserId={profile.id}
+              adminTargets={adminTargets}
               pending={adjustmentPending}
               error={adjustmentError}
               onClose={() => {

@@ -7,7 +7,9 @@ const sessionUser = {
   display_name: "Batu",
 };
 
-function createEnv() {
+const otherUserId = "999e4567-e89b-42d3-a456-426614174999";
+
+function createEnv({ isAdmin = false } = {}) {
   const statements: Array<{ sql: string; params: unknown[] }> = [];
   const assets = vi.fn(async () => new Response("<!doctype html>"));
   const env = {
@@ -22,10 +24,21 @@ function createEnv() {
             statement.params = params;
             return bound;
           },
-          first: async () =>
-            sql.includes("FROM auth_sessions") ? sessionUser : null,
+          first: async () => {
+            if (sql.includes("FROM auth_sessions")) {
+              return { ...sessionUser, is_admin: isAdmin ? 1 : 0 };
+            }
+            if (sql.includes("FROM users WHERE id = ?")) {
+              return { id: statement.params[0], display_name: "Someone" };
+            }
+            return null;
+          },
           run: async () => ({ meta: { changes: 1 } }),
-          all: async () => ({ results: [] }),
+          all: async () => ({
+            results: sql.includes("WHERE email IS NOT NULL")
+              ? [{ id: otherUserId, display_name: "Gökçe", email: "g@example.com" }]
+              : [],
+          }),
         };
         return bound;
       }),
@@ -53,6 +66,7 @@ describe("worker router", () => {
 
     expect(await response.json()).toEqual({
       user: null,
+      isAdmin: false,
       googleClientId: "client-id",
     });
     expect(statements).toHaveLength(0);
@@ -112,5 +126,70 @@ describe("worker router", () => {
     expect(response.status).toBe(200);
     const insert = statements.find(({ sql }) => sql.includes("daily_notes"));
     expect(insert?.params[0]).toBe(sessionUser.id);
+  });
+
+  describe("admin adjustments", () => {
+    function adjust(env: Env, body: Record<string, unknown>) {
+      return worker.fetch(
+        apiRequest("/api/adjustment", {
+          method: "PUT",
+          headers: { Cookie: "study_session=token" },
+          body: JSON.stringify(body),
+        }),
+        env,
+      );
+    }
+
+    it("blocks non-admins from adjusting their own time", async () => {
+      const { env, statements } = createEnv();
+      const response = await adjust(env, { minutes: 30, operation: "add" });
+
+      expect(response.status).toBe(403);
+      expect(statements.some(({ sql }) => sql.includes("INSERT"))).toBe(false);
+    });
+
+    it("blocks non-admins from adjusting another profile", async () => {
+      const { env, statements } = createEnv();
+      const response = await adjust(env, {
+        userId: otherUserId,
+        minutes: 30,
+        operation: "add",
+      });
+
+      expect(response.status).toBe(403);
+      expect(statements.some(({ sql }) => sql.includes("INSERT"))).toBe(false);
+    });
+
+    it("lets admins add time to another profile", async () => {
+      const { env, statements } = createEnv({ isAdmin: true });
+      const response = await adjust(env, {
+        userId: otherUserId,
+        minutes: 30,
+        operation: "add",
+      });
+
+      expect(response.status).toBe(200);
+      const insert = statements.find(({ sql }) =>
+        sql.includes("INSERT INTO study_adjustments"),
+      );
+      expect(insert?.params[1]).toBe(otherUserId);
+      expect(insert?.params[3]).toBe(1800);
+    });
+
+    it("lists linked profiles only for admins", async () => {
+      const request = () =>
+        apiRequest("/api/admin/users", {
+          headers: { Cookie: "study_session=token" },
+        });
+
+      expect((await worker.fetch(request(), createEnv().env)).status).toBe(403);
+      const response = await worker.fetch(
+        request(),
+        createEnv({ isAdmin: true }).env,
+      );
+      expect(await response.json()).toEqual({
+        users: [{ id: otherUserId, displayName: "Gökçe", email: "g@example.com" }],
+      });
+    });
   });
 });

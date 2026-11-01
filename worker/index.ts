@@ -1,9 +1,9 @@
-import type { UserProfile } from "../shared/contracts";
-import { getSessionUser } from "./lib/auth";
+import { getSessionUser, type SessionUser } from "./lib/auth";
 import type { Env } from "./lib/env";
 import { handleError, HttpError, json } from "./lib/http";
 import { getActivity } from "./routes/activity";
 import { putAdjustment } from "./routes/adjustment";
+import { getAdminUsers } from "./routes/admin";
 import { getAuthSession, postGoogleSignIn, postLogout } from "./routes/auth";
 import { getDashboard } from "./routes/dashboard";
 import { getLeaderboard } from "./routes/leaderboard";
@@ -14,7 +14,7 @@ type PublicHandler = (request: Request, env: Env) => Promise<Response>;
 type SignedInHandler = (
   request: Request,
   env: Env,
-  user: UserProfile,
+  user: SessionUser,
 ) => Promise<Response>;
 
 type Route = { method: string; path: string } & (
@@ -32,6 +32,7 @@ const ROUTES: Route[] = [
   { method: "PUT", path: "/api/state", handler: putState },
   { method: "PUT", path: "/api/note", handler: putNote },
   { method: "PUT", path: "/api/adjustment", handler: putAdjustment },
+  { method: "GET", path: "/api/admin/users", handler: getAdminUsers },
 ];
 
 export async function handleApiRequest(

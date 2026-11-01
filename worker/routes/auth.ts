@@ -17,6 +17,7 @@ interface GoogleSignInBody {
 interface UserRow {
   id: string;
   display_name: string;
+  is_admin: number;
 }
 
 function toProfile(row: UserRow): UserProfile {
@@ -28,7 +29,7 @@ async function findLinkedUser(
   googleSub: string,
 ): Promise<UserRow | null> {
   return env.DB.prepare(
-    "SELECT id, display_name FROM users WHERE google_sub = ?",
+    "SELECT id, display_name, is_admin FROM users WHERE google_sub = ?",
   )
     .bind(googleSub)
     .first<UserRow>();
@@ -127,6 +128,7 @@ export async function postGoogleSignIn(
   const response: GoogleSignInResponse = {
     status: "signed_in",
     user: toProfile(user),
+    isAdmin: user.is_admin === 1,
   };
   return json(response, { headers: { "Set-Cookie": cookie } });
 }
@@ -135,8 +137,10 @@ export async function getAuthSession(
   request: Request,
   env: Env,
 ): Promise<Response> {
+  const user = await getSessionUser(env, request);
   const response: AuthSessionResponse = {
-    user: await getSessionUser(env, request),
+    user: user ? { id: user.id, displayName: user.displayName } : null,
+    isAdmin: user?.isAdmin ?? false,
     googleClientId: env.GOOGLE_CLIENT_ID || null,
   };
   return json(response);

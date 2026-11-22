@@ -398,19 +398,24 @@ function App() {
     operation: StudyAdjustmentOperation,
     minutes: number,
     targetUserId: string,
+    date: string,
   ) {
     if (!profile) return;
     setAdjustmentPending(true);
     setAdjustmentError(null);
+    const ownProfile = targetUserId === profile.id;
+    // Show the adjusted day in the calendar when it is the admin's own.
+    const nextMonth = ownProfile ? date.slice(0, 7) : month;
 
     try {
       await adjustStudyTime(
+        date,
         minutes,
         operation,
-        targetUserId === profile.id ? undefined : targetUserId,
+        ownProfile ? undefined : targetUserId,
       );
       const [dashboardResult, leaderboardResult] = await Promise.allSettled([
-        getDashboard(month),
+        getDashboard(nextMonth),
         getLeaderboard(leaderboardPeriod),
       ]);
 
@@ -419,6 +424,10 @@ function App() {
       }
 
       applyDashboard(dashboardResult.value);
+      if (ownProfile) {
+        setMonth(nextMonth);
+        setSelectedDate(date);
+      }
       if (leaderboardResult.status === "fulfilled") {
         setLeaderboard(leaderboardResult.value);
         setLeaderboardError(null);
@@ -430,7 +439,7 @@ function App() {
       setAdjustmentError(
         requestError instanceof Error
           ? requestError.message
-          : "Could not adjust today's study time.",
+          : "Could not adjust study time.",
       );
     } finally {
       setAdjustmentPending(false);
@@ -565,6 +574,7 @@ function App() {
           {adjustmentOpen && isAdmin ? (
             <StudyAdjustmentSheet
               currentUserId={profile.id}
+              today={currentDate}
               adminTargets={adminTargets}
               pending={adjustmentPending}
               error={adjustmentError}

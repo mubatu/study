@@ -3,6 +3,7 @@ import type { LeaderboardPeriod } from "../../shared/contracts";
 import { MAX_DAILY_NOTE_LENGTH } from "../../shared/dailyNotes";
 import { MAX_ADJUSTMENT_MINUTES } from "../../shared/adjustments";
 import type { StudyAdjustmentOperation } from "../../shared/contracts";
+import { FIRST_STUDY_DATE } from "../../shared/studyTime";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -128,6 +129,20 @@ export function requireAdjustmentMinutes(input: unknown): number {
   }
 
   return input;
+}
+
+// Adjustments may target any study day from the first one up to today.
+export function requireAdjustmentDate(input: unknown, today: string): string {
+  const date = requireStudyDate(input);
+
+  if (date < FIRST_STUDY_DATE) {
+    throw new HttpError(400, `Date must be on or after ${FIRST_STUDY_DATE}.`);
+  }
+  if (date > today) {
+    throw new HttpError(400, "Date cannot be in the future.");
+  }
+
+  return date;
 }
 
 export function requireAdjustmentOperation(

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { MAX_ADJUSTMENT_MINUTES } from "../../shared/adjustments";
+import { FIRST_STUDY_DATE } from "../../shared/studyTime";
 import type {
   AdminUserOption,
   StudyAdjustmentOperation,
@@ -7,6 +8,8 @@ import type {
 
 interface StudyAdjustmentSheetProps {
   currentUserId: string;
+  // Current study day (YYYY-MM-DD); the latest date an adjustment may target.
+  today: string;
   // Profiles the admin can adjust; undefined while the list is loading.
   adminTargets?: AdminUserOption[];
   pending: boolean;
@@ -16,11 +19,13 @@ interface StudyAdjustmentSheetProps {
     operation: StudyAdjustmentOperation,
     minutes: number,
     targetUserId: string,
+    date: string,
   ) => Promise<void>;
 }
 
 export function StudyAdjustmentSheet({
   currentUserId,
+  today,
   adminTargets,
   pending,
   error,
@@ -29,16 +34,20 @@ export function StudyAdjustmentSheet({
 }: StudyAdjustmentSheetProps) {
   const [minutesText, setMinutesText] = useState("");
   const [targetUserId, setTargetUserId] = useState(currentUserId);
+  const [date, setDate] = useState(today);
   const minutes = Number(minutesText);
   const validMinutes =
     Number.isInteger(minutes) &&
     minutes >= 1 &&
     minutes <= MAX_ADJUSTMENT_MINUTES;
+  // Date inputs give "" when cleared; YYYY-MM-DD strings compare in date order.
+  const validDate = date >= FIRST_STUDY_DATE && date <= today;
+  const canSubmit = validMinutes && validDate && !pending;
 
   function submitAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (validMinutes && !pending) {
-      void onAdjust("add", minutes, targetUserId);
+    if (canSubmit) {
+      void onAdjust("add", minutes, targetUserId, date);
     }
   }
 
@@ -55,7 +64,7 @@ export function StudyAdjustmentSheet({
         <div className="adjustment-heading">
           <div>
             <p className="section-label">Hidden controls</p>
-            <h2 id="adjustment-title">Adjust today</h2>
+            <h2 id="adjustment-title">Adjust study time</h2>
           </div>
           <button
             className="adjustment-close"
@@ -69,8 +78,8 @@ export function StudyAdjustmentSheet({
         </div>
 
         <p className="adjustment-description">
-          Enter minutes to add or remove. This also changes today&apos;s session
-          count and leaderboard time for the selected profile.
+          Pick a profile and a study day, then enter minutes to add or remove.
+          This also changes that day&apos;s session count and leaderboard time.
         </p>
 
         <form onSubmit={submitAdd}>
@@ -93,6 +102,18 @@ export function StudyAdjustmentSheet({
               <option value={currentUserId}>Loading profiles...</option>
             )}
           </select>
+
+          <label htmlFor="adjustment-date">Date</label>
+          <input
+            id="adjustment-date"
+            type="date"
+            min={FIRST_STUDY_DATE}
+            max={today}
+            value={date}
+            disabled={pending}
+            required
+            onChange={(event) => setDate(event.target.value)}
+          />
 
           <label htmlFor="adjustment-minutes">Minutes</label>
           <input
@@ -118,15 +139,15 @@ export function StudyAdjustmentSheet({
             <button
               className="adjustment-remove"
               type="button"
-              disabled={!validMinutes || pending}
-              onClick={() => void onAdjust("remove", minutes, targetUserId)}
+              disabled={!canSubmit}
+              onClick={() => void onAdjust("remove", minutes, targetUserId, date)}
             >
               {pending ? "Updating..." : "Remove"}
             </button>
             <button
               className="adjustment-add"
               type="submit"
-              disabled={!validMinutes || pending}
+              disabled={!canSubmit}
             >
               {pending ? "Updating..." : "Add"}
             </button>

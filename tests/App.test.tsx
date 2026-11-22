@@ -575,7 +575,7 @@ describe("App", () => {
     expect(
       await screen.findByRole(
         "dialog",
-        { name: "Adjust today" },
+        { name: "Adjust study time" },
         { timeout: 1_500 },
       ),
     ).toBeInTheDocument();
@@ -591,6 +591,7 @@ describe("App", () => {
         expect.objectContaining({
           method: "PUT",
           body: JSON.stringify({
+            date: "2026-06-06",
             minutes: 30,
             operation: "add",
           }),
@@ -633,7 +634,7 @@ describe("App", () => {
       "Your name and study hours appear on the shared leaderboard.",
     );
     fireEvent.pointerDown(disclaimer);
-    await screen.findByRole("dialog", { name: "Adjust today" }, { timeout: 1_500 });
+    await screen.findByRole("dialog", { name: "Adjust study time" }, { timeout: 1_500 });
     fireEvent.pointerUp(disclaimer);
 
     const picker = screen.getByLabelText("Profile");
@@ -647,10 +648,67 @@ describe("App", () => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/adjustment",
         expect.objectContaining({
-          body: JSON.stringify({ userId: "gokce", minutes: 45, operation: "add" }),
+          body: JSON.stringify({
+            userId: "gokce",
+            date: "2026-06-06",
+            minutes: 45,
+            operation: "add",
+          }),
         }),
       ),
     );
+  });
+
+  it("lets an admin adjust an earlier study day", async () => {
+    const fetchMock = stubApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/admin/users") {
+          return jsonResponse({ users: [{ ...profile, email: "batu@example.com" }] });
+        }
+        if (url === "/api/adjustment") {
+          return jsonResponse({ date: "2026-06-02", totalSeconds: 1200, sessionCount: 1 });
+        }
+        if (url.startsWith("/api/leaderboard")) {
+          return jsonResponse(todayLeaderboard);
+        }
+        return jsonResponse(dashboard);
+      },
+      profile,
+      true,
+    );
+    const user = userEvent.setup();
+
+    render(<App />);
+    const disclaimer = await screen.findByText(
+      "Your name and study hours appear on the shared leaderboard.",
+    );
+    fireEvent.pointerDown(disclaimer);
+    await screen.findByRole("dialog", { name: "Adjust study time" }, { timeout: 1_500 });
+    fireEvent.pointerUp(disclaimer);
+
+    const dateInput = screen.getByLabelText("Date");
+    expect(dateInput).toHaveValue("2026-06-06");
+    expect(dateInput).toHaveAttribute("min", "2026-06-01");
+    expect(dateInput).toHaveAttribute("max", "2026-06-06");
+
+    await user.type(screen.getByLabelText("Minutes"), "20");
+    fireEvent.change(dateInput, { target: { value: "" } });
+    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+
+    fireEvent.change(dateInput, { target: { value: "2026-06-02" } });
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/adjustment",
+        expect.objectContaining({
+          body: JSON.stringify({ date: "2026-06-02", minutes: 20, operation: "add" }),
+        }),
+      ),
+    );
+    // The calendar moves to the adjusted day so the change is visible.
+    expect(await screen.findByText("Tuesday, June 2, 2026")).toBeInTheDocument();
   });
 
   it("does not open the hidden controls for regular users", async () => {
@@ -669,7 +727,7 @@ describe("App", () => {
     fireEvent.pointerUp(disclaimer);
 
     expect(
-      screen.queryByRole("dialog", { name: "Adjust today" }),
+      screen.queryByRole("dialog", { name: "Adjust study time" }),
     ).not.toBeInTheDocument();
   });
 });

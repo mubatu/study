@@ -1211,6 +1211,19 @@ textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(33, 87, 213, 0.08);
 }
 
+.adjustment-sheet input[type="date"] {
+  display: block;
+  margin-bottom: 16px;
+  font: inherit;
+  font-size: 15px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.adjustment-sheet input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .adjustment-sheet input::placeholder {
   color: var(--faint);
 }

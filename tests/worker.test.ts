@@ -176,6 +176,32 @@ describe("worker router", () => {
       expect(insert?.params[3]).toBe(1800);
     });
 
+    it("lets admins adjust an earlier study day", async () => {
+      const { env, statements } = createEnv({ isAdmin: true });
+      const response = await adjust(env, {
+        date: "2026-06-10",
+        minutes: 30,
+        operation: "add",
+      });
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).date).toBe("2026-06-10");
+      const insert = statements.find(({ sql }) =>
+        sql.includes("INSERT INTO study_adjustments"),
+      );
+      expect(insert?.params[2]).toBe("2026-06-10");
+    });
+
+    it("rejects adjustments for future days and days before the first", async () => {
+      for (const date of ["2099-01-01", "2026-05-31", "2026-02-30"]) {
+        const { env, statements } = createEnv({ isAdmin: true });
+        const response = await adjust(env, { date, minutes: 30, operation: "add" });
+
+        expect(response.status).toBe(400);
+        expect(statements.some(({ sql }) => sql.includes("INSERT"))).toBe(false);
+      }
+    });
+
     it("lists linked profiles only for admins", async () => {
       const request = () =>
         apiRequest("/api/admin/users", {

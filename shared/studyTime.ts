@@ -1,5 +1,7 @@
 export const STUDY_TIME_ZONE = "Europe/Istanbul";
 export const STUDY_DAY_START_HOUR = 6;
+// The first study day the app has data for.
+export const FIRST_STUDY_DATE = "2026-06-01";
 export const MAX_SESSION_DURATION_SECONDS = 3 * 60 * 60;
 export const MAX_SESSION_DURATION_MS = MAX_SESSION_DURATION_SECONDS * 1000;
 

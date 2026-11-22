@@ -172,27 +172,31 @@ export function StudyCalendar({
             className="day-sessions"
             aria-label={`Study sessions on ${formatLongDate(selectedDate)}`}
           >
-            {selectedSessions.map((session) => {
-              const seconds =
-                (Date.parse(session.endedAt) - Date.parse(session.startedAt)) /
-                1000;
-
-              return (
-                <li key={session.startedAt}>
-                  <span className="day-session-time">
-                    {formatTimeOfDay(session.startedAt)} –{" "}
-                    {session.inProgress ? "now" : formatTimeOfDay(session.endedAt)}
-                  </span>
-                  <span className="day-session-length">
-                    {session.inProgress
-                      ? "In progress"
-                      : seconds < 30
+            {selectedSessions.map((session) => (
+              <li key={session.startedAt}>
+                <span className="day-session-time">
+                  {formatTimeOfDay(session.startedAt)} –{" "}
+                  {session.inProgress ? "now" : formatTimeOfDay(session.endedAt)}
+                  {session.breakCount > 0 ? (
+                    <small className="day-session-breaks">
+                      {" · "}
+                      {session.breakCount === 1
+                        ? "1 break"
+                        : `${session.breakCount} breaks`}
+                    </small>
+                  ) : null}
+                </span>
+                <span className="day-session-length">
+                  {session.inProgress
+                    ? "In progress"
+                    : session.paused
+                      ? "Paused"
+                      : session.studiedSeconds < 30
                         ? "<1m"
-                        : formatDuration(seconds)}
-                  </span>
-                </li>
-              );
-            })}
+                        : formatDuration(session.studiedSeconds)}
+                </span>
+              </li>
+            ))}
             {selectedAdjustment ? (
               <li className="day-session--adjustment">
                 <span className="day-session-time">Manual adjustment</span>

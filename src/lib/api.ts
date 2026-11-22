@@ -109,12 +109,17 @@ export function getAdminUsers(): Promise<AdminUsersResponse> {
 
 // userId is only sent for admin adjustments of another profile.
 export function adjustStudyTime(
+  date: string,
   minutes: number,
   operation: StudyAdjustmentOperation,
   userId?: string,
 ): Promise<DailyTotal> {
   return request<DailyTotal>("/api/adjustment", {
     method: "PUT",
-    body: JSON.stringify(userId ? { userId, minutes, operation } : { minutes, operation }),
+    body: JSON.stringify(
+      userId
+        ? { userId, date, minutes, operation }
+        : { date, minutes, operation },
+    ),
   });
 }

@@ -9,6 +9,7 @@ import { buildDashboard } from "../lib/dashboard";
 import type { Env } from "../lib/env";
 import { HttpError, json, readJson } from "../lib/http";
 import {
+  requireAdjustmentDate,
   requireAdjustmentMinutes,
   requireAdjustmentOperation,
   requireUserId,
@@ -17,6 +18,8 @@ import { requireAdmin } from "./admin";
 
 interface AdjustmentRequest {
   userId?: unknown;
+  // Study day to adjust; defaults to today.
+  date?: unknown;
   minutes?: unknown;
   operation?: unknown;
 }
@@ -36,7 +39,9 @@ export async function putAdjustment(
     body.operation,
   );
   const nowMs = Date.now();
-  const studyDate = studyDayKeyForInstant(nowMs);
+  const today = studyDayKeyForInstant(nowMs);
+  const studyDate =
+    body.date === undefined ? today : requireAdjustmentDate(body.date, today);
   const month = studyDate.slice(0, 7);
 
   const dashboard = await buildDashboard(
@@ -45,10 +50,18 @@ export async function putAdjustment(
     month,
     nowMs,
   );
+  const day =
+    studyDate === dashboard.currentDay.date
+      ? dashboard.currentDay
+      : (dashboard.days.find((entry) => entry.date === studyDate) ?? {
+          date: studyDate,
+          totalSeconds: 0,
+          sessionCount: 0,
+        });
   const seconds = minutes * 60;
   const direction = operation === "add" ? 1 : -1;
-  const nextTotalSeconds = dashboard.currentDay.totalSeconds + direction * seconds;
-  const nextSessionCount = dashboard.currentDay.sessionCount + direction;
+  const nextTotalSeconds = day.totalSeconds + direction * seconds;
+  const nextSessionCount = day.sessionCount + direction;
 
   if (nextTotalSeconds < 0 || nextSessionCount < 0) {
     throw new HttpError(
@@ -58,7 +71,7 @@ export async function putAdjustment(
   }
 
   if (nextTotalSeconds > MAX_DAILY_TOTAL_SECONDS) {
-    throw new HttpError(400, "Today's total cannot exceed 24 hours.");
+    throw new HttpError(400, "A day's total cannot exceed 24 hours.");
   }
 
   await env.DB.prepare(

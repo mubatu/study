@@ -4,6 +4,7 @@ import {
   normalizeProfileName,
   normalizeDailyNote,
   requireLeaderboardPeriod,
+  requireAdjustmentDate,
   requireAdjustmentMinutes,
   requireAdjustmentOperation,
   requireMonth,
@@ -55,6 +56,14 @@ describe("API parameter validation", () => {
     expect(() => requireAdjustmentMinutes(1.5)).toThrow(HttpError);
     expect(() => requireAdjustmentMinutes(1441)).toThrow(HttpError);
     expect(() => requireAdjustmentOperation("replace")).toThrow(HttpError);
+    expect(requireAdjustmentDate("2026-06-01", "2026-06-06")).toBe("2026-06-01");
+    expect(requireAdjustmentDate("2026-06-06", "2026-06-06")).toBe("2026-06-06");
+    expect(() => requireAdjustmentDate("2026-06-07", "2026-06-06")).toThrow(
+      "Date cannot be in the future.",
+    );
+    expect(() => requireAdjustmentDate("2026-05-31", "2026-06-06")).toThrow(
+      HttpError,
+    );
   });
 });
 

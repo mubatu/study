@@ -279,7 +279,11 @@ textarea:focus-visible {
   background: #aeb5c3;
 }
 
-.status-dot--active {
+.status-dot--paused {
+  background: var(--coral);
+}
+
+.status-dot--studying {
   background: var(--blue);
   box-shadow: 0 0 0 5px rgba(33, 87, 213, 0.11);
   animation: pulse 2.4s ease-in-out infinite;
@@ -303,6 +307,10 @@ textarea:focus-visible {
   font-weight: 600;
   letter-spacing: -0.06em;
   line-height: 1.15;
+}
+
+.timer-value--paused {
+  color: var(--muted);
 }
 
 .today-total {
@@ -333,13 +341,24 @@ textarea:focus-visible {
   font-size: 11px;
 }
 
+.timer-controls {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0 43px;
+}
+
+.timer-controls--split {
+  grid-template-columns: 1fr 1fr;
+}
+
 .state-button {
   display: flex;
   width: 100%;
+  min-width: 0;
   min-height: 62px;
   align-items: center;
   justify-content: space-between;
-  margin: 24px 0 43px;
+  gap: 8px;
   padding: 0 11px 0 23px;
   border: 0;
   border-radius: 18px;
@@ -363,13 +382,34 @@ textarea:focus-visible {
   transform: translateY(1px);
 }
 
-.state-button--rest {
+.timer-controls--split .state-button {
+  padding-left: 19px;
+}
+
+.state-button--pause {
   background: var(--coral);
   box-shadow: 0 13px 28px rgba(223, 104, 79, 0.2);
 }
 
-.state-button--rest:hover {
+.state-button--pause:hover {
   background: var(--coral-dark);
+}
+
+/* Stop saves the session, so it sits beside Pause/Resume without competing. */
+.state-button--stop {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(23, 32, 51, 0.06);
+}
+
+.state-button--stop:hover {
+  background: #f1f4f9;
+}
+
+.state-button--stop .state-button-icon {
+  color: var(--coral);
+  background: #fdf0ed;
 }
 
 .state-button:disabled {
@@ -866,6 +906,12 @@ textarea:focus-visible {
   font-weight: 600;
 }
 
+.day-session-breaks {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .day-session-length {
   color: var(--muted);
   white-space: nowrap;
@@ -1163,6 +1209,19 @@ textarea:focus-visible {
 .adjustment-sheet input:focus {
   border-color: #9bb4ef;
   box-shadow: 0 0 0 3px rgba(33, 87, 213, 0.08);
+}
+
+.adjustment-sheet input[type="date"] {
+  display: block;
+  margin-bottom: 16px;
+  font: inherit;
+  font-size: 15px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.adjustment-sheet input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
 }
 
 .adjustment-sheet input::placeholder {

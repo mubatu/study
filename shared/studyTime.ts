@@ -1,5 +1,7 @@
 export const STUDY_TIME_ZONE = "Europe/Istanbul";
 export const STUDY_DAY_START_HOUR = 6;
+// The first study day the app has data for.
+export const FIRST_STUDY_DATE = "2026-06-01";
 export const MAX_SESSION_DURATION_SECONDS = 3 * 60 * 60;
 export const MAX_SESSION_DURATION_MS = MAX_SESSION_DURATION_SECONDS * 1000;
 
@@ -25,6 +27,8 @@ interface DateParts {
 
 export interface SessionInterval {
   id: string;
+  // The Start-to-Stop session this stretch belongs to; defaults to id.
+  runId?: string;
   startMs: number;
   endMs: number;
 }
@@ -157,6 +161,7 @@ export function monthBounds(monthKey: string): {
 
 export interface StudyDaySegment {
   id: string;
+  runId: string;
   date: string;
   startMs: number;
   endMs: number;
@@ -183,7 +188,13 @@ export function splitSessionsByStudyDay(
     while (cursor < cappedEndMs) {
       const date = studyDayKeyForInstant(cursor);
       const overlapEnd = Math.min(cappedEndMs, studyDayBounds(date).endMs);
-      segments.push({ id: session.id, date, startMs: cursor, endMs: overlapEnd });
+      segments.push({
+        id: session.id,
+        runId: session.runId ?? session.id,
+        date,
+        startMs: cursor,
+        endMs: overlapEnd,
+      });
       cursor = overlapEnd;
     }
   }
@@ -196,17 +207,18 @@ export function aggregateSessions(
 ): Map<string, AggregatedDay> {
   const raw = new Map<
     string,
-    { totalMs: number; sessionIds: Set<string> }
+    { totalMs: number; runIds: Set<string> }
   >();
 
   for (const segment of splitSessionsByStudyDay(sessions)) {
     const current = raw.get(segment.date) ?? {
       totalMs: 0,
-      sessionIds: new Set<string>(),
+      runIds: new Set<string>(),
     };
 
+    // A session paused and resumed has several stretches but counts once.
     current.totalMs += segment.endMs - segment.startMs;
-    current.sessionIds.add(segment.id);
+    current.runIds.add(segment.runId);
     raw.set(segment.date, current);
   }
 
@@ -216,7 +228,7 @@ export function aggregateSessions(
       {
         date,
         totalSeconds: Math.round(value.totalMs / 1000),
-        sessionCount: value.sessionIds.size,
+        sessionCount: value.runIds.size,
       },
     ]),
   );

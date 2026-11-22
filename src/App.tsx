@@ -11,6 +11,7 @@ import type {
   LeaderboardPeriod,
   LeaderboardResponse,
   StudyAdjustmentOperation,
+  StudyState,
   UserProfile,
 } from "../shared/contracts";
 import {
@@ -60,7 +61,8 @@ function App() {
   const [snapshotReceivedAt, setSnapshotReceivedAt] = useState(Date.now());
   const [loading, setLoading] = useState(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
-  const [pending, setPending] = useState(false);
+  // The state a timer button asked for, while that request is in flight.
+  const [pendingState, setPendingState] = useState<StudyState | null>(null);
   const [notePending, setNotePending] = useState(false);
   const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const [adjustmentPending, setAdjustmentPending] = useState(false);
@@ -240,15 +242,19 @@ function App() {
       : null;
     const sessionAgeAtSnapshotMs =
       activeSinceMs === null ? 0 : Math.max(0, serverMs - activeSinceMs);
+    // Paused sessions show their frozen time; a running stretch adds to it.
     const activeSeconds =
-      activeSinceMs === null
+      dashboard.state === "resting"
         ? 0
-        : Math.floor(
-            Math.min(
-              sessionAgeAtSnapshotMs + elapsedSinceSnapshotMs,
-              MAX_SESSION_DURATION_MS,
-            ) / 1000,
-          );
+        : dashboard.carriedSeconds +
+          (activeSinceMs === null
+            ? 0
+            : Math.floor(
+                Math.min(
+                  sessionAgeAtSnapshotMs + elapsedSinceSnapshotMs,
+                  MAX_SESSION_DURATION_MS,
+                ) / 1000,
+              ));
     const creditedSinceSnapshotSeconds =
       dashboard.state === "studying" && activeSinceMs !== null
         ? Math.floor(
@@ -267,15 +273,13 @@ function App() {
     };
   }, [clockMs, dashboard, snapshotReceivedAt]);
 
-  async function handleToggle() {
-    if (!profile || !dashboard) return;
-    setPending(true);
+  async function handleStateChange(nextState: StudyState) {
+    if (!profile || !dashboard || pendingState) return;
+    setPendingState(nextState);
     setError(null);
 
     try {
-      await setStudyState(
-        dashboard.state === "studying" ? "resting" : "studying",
-      );
+      await setStudyState(nextState);
       const [dashboardResult, leaderboardResult] = await Promise.allSettled([
         getDashboard(month),
         getLeaderboard(leaderboardPeriod),
@@ -301,10 +305,10 @@ function App() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Could not update your state.",
+          : "Could not update your timer.",
       );
     } finally {
-      setPending(false);
+      setPendingState(null);
     }
   }
 
@@ -394,19 +398,24 @@ function App() {
     operation: StudyAdjustmentOperation,
     minutes: number,
     targetUserId: string,
+    date: string,
   ) {
     if (!profile) return;
     setAdjustmentPending(true);
     setAdjustmentError(null);
+    const ownProfile = targetUserId === profile.id;
+    // Show the adjusted day in the calendar when it is the admin's own.
+    const nextMonth = ownProfile ? date.slice(0, 7) : month;
 
     try {
       await adjustStudyTime(
+        date,
         minutes,
         operation,
-        targetUserId === profile.id ? undefined : targetUserId,
+        ownProfile ? undefined : targetUserId,
       );
       const [dashboardResult, leaderboardResult] = await Promise.allSettled([
-        getDashboard(month),
+        getDashboard(nextMonth),
         getLeaderboard(leaderboardPeriod),
       ]);
 
@@ -415,6 +424,10 @@ function App() {
       }
 
       applyDashboard(dashboardResult.value);
+      if (ownProfile) {
+        setMonth(nextMonth);
+        setSelectedDate(date);
+      }
       if (leaderboardResult.status === "fulfilled") {
         setLeaderboard(leaderboardResult.value);
         setLeaderboardError(null);
@@ -426,7 +439,7 @@ function App() {
       setAdjustmentError(
         requestError instanceof Error
           ? requestError.message
-          : "Could not adjust today's study time.",
+          : "Could not adjust study time.",
       );
     } finally {
       setAdjustmentPending(false);
@@ -514,8 +527,8 @@ function App() {
             state={dashboard.state}
             activeSeconds={liveValues.activeSeconds}
             todaySeconds={liveValues.todaySeconds}
-            pending={pending}
-            onToggle={() => void handleToggle()}
+            pendingState={pendingState}
+            onStateChange={(nextState) => void handleStateChange(nextState)}
           />
           <Leaderboard
             data={leaderboard}
@@ -561,6 +574,7 @@ function App() {
           {adjustmentOpen && isAdmin ? (
             <StudyAdjustmentSheet
               currentUserId={profile.id}
+              today={currentDate}
               adminTargets={adminTargets}
               pending={adjustmentPending}
               error={adjustmentError}

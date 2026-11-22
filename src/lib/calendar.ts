@@ -1,4 +1,6 @@
-export const FIRST_STUDY_MONTH = "2026-06";
+import { FIRST_STUDY_DATE } from "../../shared/studyTime";
+
+export const FIRST_STUDY_MONTH = FIRST_STUDY_DATE.slice(0, 7);
 
 export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 

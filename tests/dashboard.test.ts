@@ -11,7 +11,12 @@ function createEnv(sessions: unknown[], adjustments: unknown[] = []) {
       prepare: vi.fn((sql: string) => {
         const statement = {
           bind: () => statement,
-          first: async () => ({ id: userId, display_name: "Batu" }),
+          first: async () =>
+            sql.includes("study_sessions")
+              ? ((sessions as Array<{ ended_at_ms: number | null }>).find(
+                  (session) => session.ended_at_ms === null,
+                ) ?? null)
+              : { id: userId, display_name: "Batu" },
           all: async () => ({
             results: sql.includes("study_sessions")
               ? sessions
@@ -56,13 +61,58 @@ describe("dashboard session spans", () => {
         date: "2026-06-06",
         startedAt: "2026-06-06T06:00:00.000Z",
         endedAt: "2026-06-06T07:30:00.000Z",
+        studiedSeconds: 5400,
+        breakCount: 0,
         inProgress: false,
+        paused: false,
       },
       {
         date: "2026-06-06",
         startedAt: "2026-06-06T09:15:00.000Z",
         endedAt: "2026-06-06T10:00:00.000Z",
+        studiedSeconds: 2700,
+        breakCount: 0,
         inProgress: true,
+        paused: false,
+      },
+    ]);
+  });
+
+  it("counts a paused and resumed session once", async () => {
+    const dashboard = await buildDashboard(
+      createEnv([
+        {
+          id: "first-stretch",
+          run_id: "session",
+          started_at_ms: Date.parse("2026-06-06T08:00:00Z"),
+          ended_at_ms: Date.parse("2026-06-06T08:40:00Z"),
+        },
+        {
+          id: "second-stretch",
+          run_id: "session",
+          started_at_ms: Date.parse("2026-06-06T08:50:00Z"),
+          ended_at_ms: Date.parse("2026-06-06T09:30:00Z"),
+        },
+      ]),
+      userId,
+      "2026-06",
+      nowMs,
+    );
+
+    expect(dashboard.currentDay).toEqual({
+      date: "2026-06-06",
+      totalSeconds: 80 * 60,
+      sessionCount: 1,
+    });
+    expect(dashboard.sessions).toEqual([
+      {
+        date: "2026-06-06",
+        startedAt: "2026-06-06T08:00:00.000Z",
+        endedAt: "2026-06-06T09:30:00.000Z",
+        studiedSeconds: 80 * 60,
+        breakCount: 1,
+        inProgress: false,
+        paused: false,
       },
     ]);
   });
@@ -86,7 +136,10 @@ describe("dashboard session spans", () => {
         date: "2026-06-06",
         startedAt: "2026-06-06T05:00:00.000Z",
         endedAt: "2026-06-06T08:00:00.000Z",
+        studiedSeconds: 3 * 60 * 60,
+        breakCount: 0,
         inProgress: false,
+        paused: false,
       },
     ]);
   });

@@ -89,6 +89,25 @@ describe("session aggregation", () => {
     });
   });
 
+  it("counts the stretches of one paused and resumed session once", () => {
+    const result = aggregateSessions([
+      {
+        id: "a",
+        runId: "session",
+        startMs: Date.parse("2026-06-06T08:00:00Z"),
+        endMs: Date.parse("2026-06-06T08:30:00Z"),
+      },
+      {
+        id: "b",
+        runId: "session",
+        startMs: Date.parse("2026-06-06T09:00:00Z"),
+        endMs: Date.parse("2026-06-06T10:00:00Z"),
+      },
+    ]);
+
+    expect(result.get("2026-06-06")?.sessionCount).toBe(1);
+  });
+
   it("rounds the final daily duration to the nearest second", () => {
     const result = aggregateSessions([
       { id: "a", startMs: 1_000, endMs: 90_600 },
@@ -110,12 +129,14 @@ describe("session spans per study day", () => {
     ).toEqual([
       {
         id: "late",
+        runId: "late",
         date: "2026-06-05",
         startMs: Date.parse("2026-06-06T02:00:00Z"),
         endMs: Date.parse("2026-06-06T03:00:00Z"),
       },
       {
         id: "late",
+        runId: "late",
         date: "2026-06-06",
         startMs: Date.parse("2026-06-06T03:00:00Z"),
         endMs: Date.parse("2026-06-06T05:00:00Z"),

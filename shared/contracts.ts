@@ -1,4 +1,5 @@
-export type StudyState = "studying" | "resting";
+// "paused" keeps the current session's timer value; "resting" means no session.
+export type StudyState = "studying" | "paused" | "resting";
 
 export interface UserProfile {
   id: string;
@@ -41,12 +42,16 @@ export interface DailyNote {
   text: string;
 }
 
-// One study session's part within a single 06:00-to-06:00 study day.
+// One Start-to-Stop study session's part within a single 06:00-to-06:00 study
+// day. startedAt/endedAt include breaks; studiedSeconds does not.
 export interface StudySessionSpan {
   date: string;
   startedAt: string;
   endedAt: string;
+  studiedSeconds: number;
+  breakCount: number;
   inProgress: boolean;
+  paused: boolean;
 }
 
 // Net manual change an admin made to a study day's total.
@@ -60,6 +65,9 @@ export interface DashboardResponse {
   serverTime: string;
   state: StudyState;
   activeSince: string | null;
+  // Timer time already counted in the current session: before activeSince
+  // while studying, or the frozen value while paused. 0 while resting.
+  carriedSeconds: number;
   currentDay: DailyTotal;
   month: string;
   days: DailyTotal[];
@@ -72,6 +80,7 @@ export interface StateResponse {
   state: StudyState;
   serverTime: string;
   activeSince: string | null;
+  carriedSeconds: number;
 }
 
 export type StudyAdjustmentOperation = "add" | "remove";

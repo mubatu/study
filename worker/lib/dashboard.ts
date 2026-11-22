@@ -16,6 +16,7 @@ import {
 } from "../../shared/studyTime";
 import type { Env } from "./env";
 import { HttpError } from "./http";
+import { readTimer } from "./timer";
 
 interface UserRow {
   id: string;
@@ -24,6 +25,7 @@ interface UserRow {
 
 interface SessionRow {
   id: string;
+  run_id?: string | null;
   started_at_ms: number;
   ended_at_ms: number | null;
 }
@@ -69,9 +71,9 @@ export async function buildDashboard(
   const rangeStart = Math.min(currentBounds.startMs, requestedBounds.startMs);
   const rangeEnd = Math.max(currentBounds.endMs, requestedBounds.endMs);
 
-  const [result, noteResult, adjustmentResult] = await Promise.all([
+  const [result, noteResult, adjustmentResult, timer] = await Promise.all([
     env.DB.prepare(
-      `SELECT id, started_at_ms, ended_at_ms
+      `SELECT id, COALESCE(run_id, id) AS run_id, started_at_ms, ended_at_ms
          FROM study_sessions
         WHERE user_id = ?
           AND started_at_ms < ?
@@ -101,10 +103,12 @@ export async function buildDashboard(
     )
       .bind(userId, `${month}-%`, currentDayKey)
       .all<AdjustmentRow>(),
+    readTimer(env, userId, nowMs),
   ]);
 
   const sessions = result.results.map((session) => ({
     id: session.id,
+    runId: session.run_id ?? session.id,
     startMs: session.started_at_ms,
     endMs: Math.min(session.ended_at_ms ?? nowMs, nowMs),
   }));
@@ -118,14 +122,49 @@ export async function buildDashboard(
       )
       .map((session) => session.id),
   );
-  const sessionSpans: StudySessionSpan[] = splitSessionsByStudyDay(sessions)
-    .filter((segment) => segment.date.startsWith(month))
-    .sort((a, b) => a.startMs - b.startMs)
-    .map((segment) => ({
+  // One row per session and day: its stretches merge into a single span.
+  const spansByRunAndDay = new Map<
+    string,
+    {
+      date: string;
+      runId: string;
+      startMs: number;
+      endMs: number;
+      studiedMs: number;
+      stretches: number;
+      inProgress: boolean;
+    }
+  >();
+  for (const segment of splitSessionsByStudyDay(sessions)) {
+    if (!segment.date.startsWith(month)) continue;
+    const key = `${segment.runId}|${segment.date}`;
+    const span = spansByRunAndDay.get(key) ?? {
       date: segment.date,
-      startedAt: new Date(segment.startMs).toISOString(),
-      endedAt: new Date(segment.endMs).toISOString(),
-      inProgress: openSessionIds.has(segment.id) && segment.endMs === nowMs,
+      runId: segment.runId,
+      startMs: segment.startMs,
+      endMs: segment.endMs,
+      studiedMs: 0,
+      stretches: 0,
+      inProgress: false,
+    };
+    span.startMs = Math.min(span.startMs, segment.startMs);
+    span.endMs = Math.max(span.endMs, segment.endMs);
+    span.studiedMs += segment.endMs - segment.startMs;
+    span.stretches += 1;
+    span.inProgress ||=
+      openSessionIds.has(segment.id) && segment.endMs === nowMs;
+    spansByRunAndDay.set(key, span);
+  }
+  const sessionSpans: StudySessionSpan[] = [...spansByRunAndDay.values()]
+    .sort((a, b) => a.startMs - b.startMs)
+    .map((span) => ({
+      date: span.date,
+      startedAt: new Date(span.startMs).toISOString(),
+      endedAt: new Date(span.endMs).toISOString(),
+      studiedSeconds: Math.round(span.studiedMs / 1000),
+      breakCount: span.stretches - 1,
+      inProgress: span.inProgress,
+      paused: timer.state === "paused" && span.runId === timer.pausedRunId,
     }));
   const adjustments: StudyDayAdjustment[] = adjustmentResult.results
     .filter(
@@ -163,9 +202,6 @@ export async function buildDashboard(
     date: note.study_date,
     text: note.note,
   }));
-  const openSession = result.results.find(
-    (session) => session.ended_at_ms === null,
-  );
   const currentDay = totals.get(currentDayKey) ?? {
     date: currentDayKey,
     totalSeconds: 0,
@@ -175,10 +211,9 @@ export async function buildDashboard(
   return {
     user,
     serverTime: new Date(nowMs).toISOString(),
-    state: openSession ? "studying" : "resting",
-    activeSince: openSession
-      ? new Date(openSession.started_at_ms).toISOString()
-      : null,
+    state: timer.state,
+    activeSince: timer.activeSince,
+    carriedSeconds: timer.carriedSeconds,
     currentDay,
     month,
     days,

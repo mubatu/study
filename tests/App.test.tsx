@@ -24,6 +24,7 @@ const dashboard: DashboardResponse = {
   serverTime: "2026-06-06T10:00:00.000Z",
   state: "resting",
   activeSince: null,
+  carriedSeconds: 0,
   currentDay: {
     date: "2026-06-06",
     totalSeconds: 13_320,
@@ -344,10 +345,77 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByText("03:00:00")).toBeInTheDocument();
-    expect(screen.getByText("Current session · 3h max")).toBeInTheDocument();
+    expect(screen.getByText("Current session · 3h max without a break")).toBeInTheDocument();
     expect(
       screen.getByText("06:00 to 05:59, Istanbul time").parentElement,
     ).toHaveTextContent("3h");
+  });
+
+  it("pauses, resumes and stops the current session", async () => {
+    let serverState: DashboardResponse = {
+      ...dashboard,
+      state: "studying",
+      activeSince: "2026-06-06T09:30:00.000Z",
+      carriedSeconds: 600,
+    };
+    const stateRequests: string[] = [];
+    stubApi(async (input, init) => {
+      const url = String(input);
+      if (url.startsWith("/api/leaderboard")) {
+        return jsonResponse(todayLeaderboard);
+      }
+      if (url === "/api/state") {
+        const { state } = JSON.parse(String(init?.body));
+        stateRequests.push(state);
+        serverState =
+          state === "paused"
+            ? { ...serverState, state, activeSince: null, carriedSeconds: 2400 }
+            : state === "studying"
+              ? {
+                  ...serverState,
+                  state,
+                  activeSince: serverState.serverTime,
+                  carriedSeconds: 2400,
+                }
+              : { ...serverState, state, activeSince: null, carriedSeconds: 0 };
+        return jsonResponse({
+          state: serverState.state,
+          serverTime: serverState.serverTime,
+          activeSince: serverState.activeSince,
+          carriedSeconds: serverState.carriedSeconds,
+        });
+      }
+      return jsonResponse(serverState);
+    });
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    // 10 minutes carried from before a pause plus 30 minutes in this stretch.
+    expect(await screen.findByText("00:40:00")).toBeInTheDocument();
+    const controls = screen.getByRole("group", { name: "Session controls" });
+    expect(within(controls).getAllByRole("button").map((b) => b.textContent))
+      .toEqual(["Pause", "Stop"]);
+
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    expect(await screen.findByText("Session paused")).toBeInTheDocument();
+    expect(screen.getByText("Paused")).toBeInTheDocument();
+    expect(screen.getByText("00:40:00")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resume" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeInTheDocument();
+    expect(screen.getByText("00:40:00")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Stop" }));
+    expect(
+      await screen.findByRole("button", { name: "Start studying" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("00:00:00")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Session controls" }),
+    ).not.toBeInTheDocument();
+    expect(stateRequests).toEqual(["paused", "studying", "resting"]);
   });
 
   it("lists the selected day's session times", async () => {
@@ -360,13 +428,19 @@ describe("App", () => {
           date: "2026-06-06",
           startedAt: "2026-06-06T06:00:00.000Z",
           endedAt: "2026-06-06T07:30:00.000Z",
+          studiedSeconds: 4500,
+          breakCount: 1,
           inProgress: false,
+          paused: false,
         },
         {
           date: "2026-06-06",
           startedAt: "2026-06-06T09:15:00.000Z",
           endedAt: "2026-06-06T10:00:00.000Z",
+          studiedSeconds: 2700,
+          breakCount: 0,
           inProgress: true,
+          paused: false,
         },
       ],
       adjustments: [{ date: "2026-06-06", deltaSeconds: 1800 }],
@@ -385,8 +459,9 @@ describe("App", () => {
     });
     const rows = within(list).getAllByRole("listitem");
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toHaveTextContent("09:00 – 10:30");
-    expect(rows[0]).toHaveTextContent("1h 30m");
+    // A session with a break shows its whole span and only the time studied.
+    expect(rows[0]).toHaveTextContent("09:00 – 10:30 · 1 break");
+    expect(rows[0]).toHaveTextContent("1h 15m");
     expect(rows[1]).toHaveTextContent("12:15 – now");
     expect(rows[1]).toHaveTextContent("In progress");
     expect(rows[2]).toHaveTextContent("Manual adjustment");
